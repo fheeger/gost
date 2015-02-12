@@ -1,0 +1,90 @@
+import bpy
+from bpy.props import *
+ 
+#Befundbeschreibung#
+
+def initSceneProperties(scn):
+
+    bpy.types.Scene.MyString = StringProperty(
+        name = "Text")
+    scn['MyString'] = "Hier muss ein Link zur SQL Datenbank hin. Abhängig vom selektierten Objekt"
+
+#Das Stringfenster muss größer gezogen werden#
+#Können Änderungen in die SQL geschrieben werden?#
+
+#Umschalten zwischen der Lage der Beschreibungen#
+ 
+    bpy.types.Scene.MyEnum = EnumProperty(
+        items = [('Eine', 'Generally', 'One'), 
+                 ('Zwei', 'Plana', 'Two'),
+                 ('Drei', 'Profile', 'Two'),
+                 ('Vier', 'Layer', 'Three')],
+        name = "Location")
+    scn['MyEnum'] = 2
+
+#Eine, Zwei, Drei, sind derzeit Printbefehle. Hier muss zwischen textblöcken umgeschaltet werden#
+#Alternativ könnte hier eine Importfunktion für die verschiedenen sql dateien hin#
+
+
+    return
+ 
+initSceneProperties(bpy.context.scene)
+#Was ist das hier wohl?#
+
+
+#Paneleinstellungen# 
+
+class UIPanel(bpy.types.Panel):
+    bl_label = "Feature Description"
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "TOOLS"
+    bl_category = "Descr"
+
+#Layout-definitionen#
+ 
+    def draw(self, context):
+        layout = self.layout
+        scn = context.scene
+        TheCol = self.layout.column(align=True)
+        TheCol.operator("view.selected", text="Center Feature")
+        layout.prop(scn, 'MyEnum')
+        layout.prop(scn, 'MyString')
+
+
+
+#Im folgenden scheinen die Befehlsausführungen aufgestellt zu sein (print)#
+class OBJECT_OT_PrintPropsButton(bpy.types.Operator):
+    bl_idname = "idname_must.be_all_lowercase_and_contain_one_dot"
+    bl_label = "Print props"
+ 
+    def execute(self, context):
+        scn = context.scene
+
+        printProp("Enum:   ", 'MyEnum', scn)
+        printProp("String: ", 'MyString', scn)
+        return{'FINISHED'}    
+ 
+def printProp(label, key, scn):
+    try:
+        val = scn[key]
+    except:
+        val = 'Undefined'
+    print("%s %s" % (key, val))
+ 
+
+class viewselected(bpy.types.Operator) :
+    bl_idname = "view.selected"
+    bl_label = "UIPanel"
+    bl_options = {"UNDO"}
+
+    def invoke(self, context, event) :
+        bpy.ops.view3d.view_selected()
+   
+        return {"FINISHED"}
+
+
+
+
+#    Registration
+bpy.utils.register_module(__name__)
+
