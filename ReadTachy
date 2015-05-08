@@ -1,0 +1,163 @@
+import bpy
+from bpy.props import *
+
+
+
+def nivellementGroup(pl):
+    name = "Nivellement_"+str(pl)
+    for group in bpy.data.groups:
+        if group.name == name:
+            return group
+    bpy.data.groups.new(name)
+    return bpy.data.groups[-1]
+
+def addNivellement(x,y,z, pl):
+    
+    group = nivellementGroup(pl)
+    
+    bpy.ops.object.text_add(location=(x,y,z))
+    ob = bpy.context.object
+    text = str(z)+"mNN"
+    ob.name = (text)
+    tcu = ob.data
+    tcu.name = (text)
+    tcu.body = (text)
+    tcu.font = bpy.data.fonts[0]
+    tcu.offset_x = -0.30
+    tcu.offset_y = 0.18
+    tcu.shear = 0
+    tcu.size = 0.2
+    tcu.space_character = 1.1
+    tcu.space_word = 1
+    #tcu.extrude = 0.1
+    tcu.fill_mode="FRONT"
+    tcu.use_fill_deform = True
+    tcu.fill_mode="FRONT"
+    bpy.ops.object.group_link(group=group.name)
+    
+    #startVert = len(me.vertices)
+    me = bpy.data.meshes.new("NIV")
+    ob = bpy.data.objects.new("NIV", me)
+    bpy.context.scene.objects.link(ob)
+    points = [[x, y, z], [x+0.08, y+0.12, z], [x-0.08, y+0.12, z]]
+    faces = [[0,1,2]]
+    me.from_pydata(points, [], faces)
+    me.update()
+    bpy.context.scene.objects.active = ob
+    bpy.ops.object.group_link(group=group.name)
+   
+#Umwandlung der DAT-datei in Blender Meshes
+
+def importDAT(path, codeSep="_"):
+    me = bpy.data.meshes.new("Vermessung")
+    ob = bpy.data.objects.new("Vermessung", me)
+    bpy.context.scene.objects.link(ob)
+    punkte = []
+    flaechen = []
+    start = 0
+    punktNr = -1
+    xVersatz = bpy.context.scene.xVersatz
+    yVersatz = bpy.context.scene.yVersatz
+    dat = open(path,'r')
+    for zeile in dat:
+        nr, code, _1, xStr, _2, yStr, _3, zStr= zeile.strip().split()
+        x = float(xStr) - xVersatz
+        y = float(yStr) - yVersatz
+        z = float(zStr)
+        codeList = code.split(codeSep) #TODO: das code Trennzeichen konfigurierbar machen?
+        pl = int(codeList[0])
+        if len(codeList)>1:
+            if codeList[1] == "NI":
+                addNivellement(x, y, z, pl)
+        punktNr+=1
+        punkte.append([x, y, z])
+        if code[-1] == "@" or code[-1] == "$":
+            flaechen.append(list(range(start, punktNr+1)))
+            start = punktNr+1
+    print(punkte)
+    print(flaechen)
+            
+    me.from_pydata(punkte, [], flaechen)
+    me.update()
+
+
+
+#Angabe des Pfades mithilfe des Knopfes Select DAT
+
+class ReadTachyOperator(bpy.types.Operator):
+    bl_idname = "read.tachy"
+    bl_label = "Read tachymeter data"
+    filepath = bpy.props.StringProperty(subtype="FILE_PATH")
+
+    def execute(self, context):
+        print(self.filepath)
+        importDAT(self.filepath)
+        return {'FINISHED'}
+
+    def invoke(self, context, event):
+        context.window_manager.fileselect_add(self)
+        return {'RUNNING_MODAL'}  
+
+
+def menu_func(self, context):
+    self.layout.operator_context = 'INVOKE_DEFAULT'
+    self.layout.operator(ReadTachyOperator.bl_idname,
+            text="Tachymeter data (.dat)",
+            icon='PLUGIN'
+            )
+
+        
+
+
+#definition der Eigenschaft "Versatz" für X und Y Achse
+
+def Versatz(scn):
+ 
+    bpy.types.Scene.xVersatz = IntProperty(
+        name = "x-Versatz", 
+        description = "Koordinatenversatz auf der X Achse eingeben:",
+        default = 3417000,
+        min = 1,
+        max = 10000000)
+
+    bpy.types.Scene.yVersatz = IntProperty(
+        name = "y-Versatz", 
+        description = "Koordinatenversatz auf der Y Achse eingeben:",
+        default = 5754000,
+        min = 1,
+        max = 10000000)
+    scn['xVersatz'] = 3417000
+    scn['yVersatz'] = 5754000
+    return 
+
+Versatz(bpy.context.scene)
+
+#klassifizierung des Measurment Panels
+
+class ImportPanel(bpy.types.Panel):
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "TOOLS"
+    bl_context = "objectmode"
+    bl_category = "Import"
+    bl_label = "Measurement Panel"
+   
+
+ 
+    def draw(self, context):
+        layout = self.layout.column(align=True)
+        layout = self.layout
+        scn = context.scene
+        layout.prop(scn, 'xVersatz')
+        layout.prop(scn, 'yVersatz')
+        layout.operator("read.tachy", text="Select DAT") 
+
+
+ 
+#    Registration
+bpy.types.INFO_MT_file_import.append(menu_func)
+bpy.utils.register_module(__name__)
+
+
+
+#Ferner müssen hier noch Fundsymbole und Profilsymbole eingefügt werden. 
+#Das Mesh erzeugen sollte noch auch 1_... reduziert werden.
