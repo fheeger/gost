@@ -1,0 +1,103 @@
+import bpy
+from bpy.props import *
+
+def initSceneProperties(scn):
+ 
+    bpy.types.Scene.CountNiv = IntProperty(
+        name = "Niv", 
+        description = "Enter the first Number",
+        default = 1,
+        min = 1,
+        max = 1000)
+
+    bpy.types.Scene.NivString = StringProperty(
+        name = "Niv name")
+    scn['NivString'] = "Text"
+    return
+ 
+initSceneProperties(bpy.context.scene)
+
+
+
+
+class NivPanel(bpy.types.Panel):
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "TOOLS"
+    bl_context = "objectmode"
+    bl_category = "Tools"
+    bl_label = "Niv Panel"
+   
+
+ 
+    def draw(self, context):
+        layout = self.layout.column(align=True)
+        layout.operator("mesh.niv_number", text="Niv Number")
+        layout = self.layout
+        scn = context.scene
+        layout.prop(scn, 'CountNiv')
+        layout.prop(scn, 'NivString')
+
+        
+        
+class NivNumber(bpy.types.Operator) :
+    bl_idname = "mesh.niv_number"
+    bl_label = "Niv Panel"
+    bl_options = {"UNDO"}
+ 
+    def invoke(self, context, event) :
+        value1 = bpy.context.scene.CountNiv
+        bpy.context.scene.CountNiv += 1
+        string1 = bpy.context.scene.NivString
+        strval = str(string1)+str(value1)
+        bpy.ops.object.text_add()
+        ob = bpy.context.object
+        ob.name = (str(strval))
+        tcu = ob.data
+        tcu.name = (str(strval))
+        tcu.body = (str(strval))
+        tcu.font = bpy.data.fonts[0]
+        tcu.offset_x = -0.01
+        tcu.offset_y = 0.03
+        tcu.shear = 0
+        tcu.size = .06
+        tcu.space_character = 1.1
+        tcu.space_word = 2
+        tcu.extrude = 0.002
+        tcu.fill_mode="FRONT"
+        tcu.use_fill_deform = True
+        tcu.fill_mode="FRONT"
+
+       
+        coords = [[-0.017,0.017,0],[0.017,0.017,0],[-0.015,0.015,0],[0.015,0.015,0],[0,0,0],[-0.015,-0.015,0],[0.015,-0.015,0],[-0.017,-0.017,0],[0.017,-0.017,0] ]
+        faces = [[0,2,3,1],[4,3,2],[4,5,6],[5,7,8,6],[0,7,5,2],[1,3,6,8]]
+        me = bpy.data.meshes.new("Triangle")
+        ob = bpy.data.objects.new("Triangle", me)
+        #bpy.context.scene.objects.link(ob)
+        ob.location = bpy.context.scene.cursor_location
+        bpy.context.scene.objects.link(ob)
+        #mesh.from_pydata([context.scene.cursor_location], [], [])
+        me.from_pydata(coords, [], faces)
+        me.update()
+        bpy.context.scene.objects.active = ob
+        
+        return {"FINISHED"}
+
+class OBJECT_OT_PrintPropsButton(bpy.types.Operator):
+    bl_idname = "idname_must.be_all_lowercase_and_contain_one_dot"
+    bl_label = "Print props"
+ 
+    def execute(self, context):
+        scn = context.scene
+        printProp("Float:  ", 'CountNiv', scn)
+        printProp("String: ", 'NivString', scn)
+        return{'FINISHED'}    
+ 
+def printProp(label, key, scn):
+    try:
+        val = scn[key]
+    except:
+        val = 'Undefined'
+    print("%s %s" % (key, val))
+ 
+#    Registration
+bpy.utils.register_module(__name__)
