@@ -181,7 +181,7 @@ class TachyError(IOError):
 #tachy = TachyConnection("/dev/ttyUSB0")
 #tachy.beep()
 
-bpy.types.Scene.tachy = TachyConnection("/dev/ttyUSB0")
+bpy.types.Scene.tachy = TachyConnection("/dev/pts/11")
 
 
 class StationPoint1(bpy.types.Operator):
@@ -195,7 +195,7 @@ class StationPoint1(bpy.types.Operator):
         mes = context.scene.tachy.readMeasurment()
         context.scene.tachy.setAngle(0.0)
         bpy.types.Scene.distStationPoint1 = mes["slopeDist"]
-        return {"FINISHEDr"}
+        return {"FINISHED"}
 
 class StationPoint2(bpy.types.Operator):
     bl_idname = "mesh.station_point2"
@@ -255,11 +255,28 @@ class SetStation(bpy.types.Operator):
         #self.log.write("Station set successful.\n")   
         return {"FINISHED"}
 
+class MeasurePoint(bpy.types.Operator):
+    bl_idname = "mesh.measure_point"
+    bl_label = "Tachy Panel"
+    bl_options = {"UNDO"}
+    
+    def invoke(self, context, event):
+        measurment = context.scene.tachy.readMeasurment()
+        print(measurment)
+        x = measurment["targetEast"]
+        y = measurment["targetNorth"]
+        z = measurment["targetHeight"] 
+        bpy.ops.mesh.extrude_region_move(MESH_OT_extrude_region={"mirror":False}, TRANSFORM_OT_translate={"value":(0, 0, 0), "constraint_axis":(False, False, False), "constraint_orientation":'GLOBAL', "mirror":False, "proportional":'DISABLED', "proportional_edit_falloff":'SMOOTH', "proportional_size":1, "snap":False, "snap_target":'CLOSEST', "snap_point":(0, 0, 0), "snap_align":False, "snap_normal":(0, 0, 0), "gpencil_strokes":False, "texture_space":False, "remove_on_cancel":False, "release_confirm":False})
+        bpy.context.scene.cursor_location = (x, y, z)
+        bpy.context.area.type='VIEW_3D'
+        bpy.ops.view3d.snap_selected_to_cursor(use_offset=False)
+        #bpy.context.area.type='TEXT_EDITOR'
+        return {"FINISHED"}
 
 class TachyPanel(bpy.types.Panel):
     bl_space_type = "VIEW_3D"
     bl_region_type = "TOOLS"
-    bl_context = "objectmode"
+    bl_context = "mesh_edit"
     bl_category = "Tools"
     bl_label = "Tachy Panel"
      
@@ -271,5 +288,6 @@ class TachyPanel(bpy.types.Panel):
         layout.operator("mesh.station_point1", text="Station Point 1")
         layout.operator("mesh.station_point2", text="Station Point 2")
         layout.operator("mesh.set_station", text="Compute Station")
-
+        layout.operator("mesh.measure_point", text="Measure Point")
+        
 bpy.utils.register_module(__name__)
