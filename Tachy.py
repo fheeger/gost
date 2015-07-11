@@ -181,7 +181,7 @@ class TachyError(IOError):
 #tachy = TachyConnection("/dev/ttyUSB0")
 #tachy.beep()
 
-bpy.types.Scene.tachy = TachyConnection("/dev/pts/11")
+bpy.types.Scene.tachy = TachyConnection("COM2")
 
 
 class StationPoint1(bpy.types.Operator):
@@ -273,10 +273,25 @@ class MeasurePoint(bpy.types.Operator):
         #bpy.context.area.type='TEXT_EDITOR'
         return {"FINISHED"}
 
-class TachyPanel(bpy.types.Panel):
+class MeasurePanel(bpy.types.Panel):
     bl_space_type = "VIEW_3D"
     bl_region_type = "TOOLS"
     bl_context = "mesh_edit"
+    bl_category = "Tools"
+    bl_label = "Measure Panel"
+     
+   
+
+ 
+    def draw(self, context):
+        layout = self.layout.column(align=True)
+        layout.operator("mesh.measure_point", text="Measure Point")
+        
+        
+class TachyPanel(bpy.types.Panel):
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "TOOLS"
+    bl_context = "objectmode"
     bl_category = "Tools"
     bl_label = "Tachy Panel"
      
@@ -288,6 +303,7 @@ class TachyPanel(bpy.types.Panel):
         layout.operator("mesh.station_point1", text="Station Point 1")
         layout.operator("mesh.station_point2", text="Station Point 2")
         layout.operator("mesh.set_station", text="Compute Station")
-        layout.operator("mesh.measure_point", text="Measure Point")
-        
+
+                
+
 bpy.utils.register_module(__name__)
