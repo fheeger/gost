@@ -181,7 +181,7 @@ class TachyError(IOError):
 #tachy = TachyConnection("/dev/ttyUSB0")
 #tachy.beep()
 
-bpy.types.Scene.tachy = TachyConnection("COM2")
+bpy.types.Scene.tachy = TachyConnection("COM1")
 
 
 class StationPoint1(bpy.types.Operator):
@@ -194,7 +194,7 @@ class StationPoint1(bpy.types.Operator):
         bpy.types.Scene.stationPoint1 = bpy.context.scene.objects.active.location
         mes = context.scene.tachy.readMeasurment()
         context.scene.tachy.setAngle(0.0)
-        bpy.types.Scene.distStationPoint1 = mes["slopeDist"]
+        bpy.types.Scene.distStationPoint1 = numpy.cos(mes["vertAngle"])/ mes["slopeDist"]
         return {"FINISHED"}
 
 class StationPoint2(bpy.types.Operator):
@@ -205,7 +205,7 @@ class StationPoint2(bpy.types.Operator):
     def invoke(self, context, event):
         bpy.types.Scene.stationPoint2 = bpy.context.scene.objects.active.location
         mes = context.scene.tachy.readMeasurment()
-        bpy.types.Scene.distStationPoint2 = mes["slopeDist"]
+        bpy.types.Scene.distStationPoint2 = numpy.cos(mes["vertAngle"])/ mes["slopeDist"]
         bpy.types.Scene.angleStationPoint2 = mes["hzAngle"]
         return {"FINISHED"}
 
@@ -255,8 +255,81 @@ class SetStation(bpy.types.Operator):
         #self.log.write("Station set successful.\n")   
         return {"FINISHED"}
 
+
+
 class MeasurePoint(bpy.types.Operator):
     bl_idname = "mesh.measure_point"
+    bl_label = "Measure Panel"
+    bl_options = {"UNDO"}
+    
+    def invoke(self, context, event):
+        measurment = context.scene.tachy.readMeasurment()
+        print(measurment)
+        x = measurment["targetEast"]
+        y = measurment["targetNorth"]
+        z = measurment["targetHeight"] 
+        bpy.ops.mesh.extrude_region_move(MESH_OT_extrude_region={"mirror":False}, TRANSFORM_OT_translate={"value":(0, 0, 0), "constraint_axis":(False, False, False), "constraint_orientation":'GLOBAL', "mirror":False, "proportional":'DISABLED', "proportional_edit_falloff":'SMOOTH', "proportional_size":1, "snap":False, "snap_target":'CLOSEST', "snap_point":(0, 0, 0), "snap_align":False, "snap_normal":(0, 0, 0), "gpencil_strokes":False, "texture_space":False, "remove_on_cancel":False, "release_confirm":False})
+        bpy.context.scene.cursor_location = (x, y, z)
+        bpy.context.area.type='VIEW_3D'
+        bpy.ops.view3d.snap_selected_to_cursor(use_offset=False)
+        #bpy.context.area.type='TEXT_EDITOR'
+        return {"FINISHED"}
+
+
+
+class MeasureNiv(bpy.types.Operator):
+    bl_idname = "mesh.measure_point"
+    bl_label = "Tachy Panel"
+    bl_options = {"UNDO"}
+    
+    def invoke(self, context, event):
+        measurment = context.scene.tachy.readMeasurment()
+        print(measurment)
+        x = measurment["targetEast"]
+        y = measurment["targetNorth"]
+        z = measurment["targetHeight"] 
+        
+        value1 = bpy.context.scene.CountNiv
+        bpy.context.scene.CountNiv += 1
+        string1 = bpy.context.scene.NivString
+        strval = str(string1)+str(value1)
+        bpy.ops.object.text_add()
+        ob = bpy.context.object
+        ob.name = (str(strval))
+        tcu = ob.data
+        tcu.name = (str(strval))
+        tcu.body = (str(strval))
+        tcu.font = bpy.data.fonts[0]
+        tcu.offset_x = -0.01
+        tcu.offset_y = 0.03
+        tcu.shear = 0
+        tcu.size = .06
+        tcu.space_character = 1.1
+        tcu.space_word = 2
+        tcu.extrude = 0.002
+        tcu.fill_mode="FRONT"
+        tcu.use_fill_deform = True
+        tcu.fill_mode="FRONT"
+
+       
+        coords = [[x, y, z], [x-0.016, y+0.024, z], [x+0.016, y+0.024, z]]
+        faces = [[0,2,1]]
+        me = bpy.data.meshes.new("Triangle")
+        ob = bpy.data.objects.new("Triangle", me)
+        #bpy.context.scene.objects.link(ob)
+        ob.location = bpy.context.scene.cursor_location
+        bpy.context.scene.objects.link(ob)
+        #mesh.from_pydata([context.scene.cursor_location], [], [])
+        me.from_pydata(coords, [], faces)
+        me.update()
+        bpy.context.scene.objects.active = ob
+        
+        return {"FINISHED"}
+
+
+
+class MeasureCheckpoint(bpy.types.Operator):
+    bl_idname = "mesh.measure_checkpoint"
     bl_label = "Tachy Panel"
     bl_options = {"UNDO"}
     
@@ -273,20 +346,20 @@ class MeasurePoint(bpy.types.Operator):
         #bpy.context.area.type='TEXT_EDITOR'
         return {"FINISHED"}
 
+
+
 class MeasurePanel(bpy.types.Panel):
     bl_space_type = "VIEW_3D"
     bl_region_type = "TOOLS"
     bl_context = "mesh_edit"
     bl_category = "Tools"
     bl_label = "Measure Panel"
-     
-   
-
  
     def draw(self, context):
         layout = self.layout.column(align=True)
         layout.operator("mesh.measure_point", text="Measure Point")
         
+      
         
 class TachyPanel(bpy.types.Panel):
     bl_space_type = "VIEW_3D"
@@ -302,7 +375,10 @@ class TachyPanel(bpy.types.Panel):
         layout = self.layout.column(align=True)
         layout.operator("mesh.station_point1", text="Station Point 1")
         layout.operator("mesh.station_point2", text="Station Point 2")
+        layout = self.layout.column(align=True)
         layout.operator("mesh.set_station", text="Compute Station")
+        
+
 
                 
 
