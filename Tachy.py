@@ -6,7 +6,10 @@ import serial
 import bpy
 
 def dist(x1,y1,x2,y2):
-    return numpy.sqrt((x1-x2)**2+(y1-y2)**2)
+    return numpy.sqrt((x2-x1)**2+(y2-y1)**2)
+
+def delta(x,y):
+    return numpy.abs(x-y)
 
 def polar2kart(alpha_g, dist):
     gon2rad = 2*numpy.pi/400
@@ -58,6 +61,8 @@ class TachyConnection:
               "83": 3,
               "84": 3,
               "85": 3,
+              "86": 3,
+              "87": 3,
               }
 
     def __init__(self, dev, baut=4800, log=sys.stderr):
@@ -83,9 +88,8 @@ class TachyConnection:
         lines = mStr.split(" ")
         for line in lines:
             word_index = line[0:2]
-            data_info = line[3:7]
-#            sign = line[7]
-            data = line[7:]
+            data_info = line[3:6]
+            data = line[6:]
             if word_index in self.digits:
                 data_point[self.codes[word_index]] = float(data)/10**self.digits[word_index]
             else:
@@ -94,64 +98,18 @@ class TachyConnection:
             raise TachyError()
         self.write("OK\r\n")
         return data_point
-        
-    def stationierung(self, A, B):
-        #set tachy position to zero
-        self.setPosition(0.0, 0.0)
-        a = self.readMeasurment()
-#        self.log.write("%s\n" % self.port.read())
-        self.log.write("Point one read %f %f\n" % (a["targetEast"], a["targetNorth"]))
-        self.setAngle(0.0)
-        
-        b = self.readMeasurment()
-        self.log.write("Point two read %f %f\n" % (b["targetEast"], b["targetNorth"]))
-        
-        sfsa = a["slopeDist"]
-        sfsb = b["slopeDist"]
-        beta = b["hzAngle"]*2*numpy.pi/400
-        self.log.write("Abstand zu A: %f, Abstand zu B: %f, Winkel zu B: %f(rad)\n" % (sfsa, sfsb, beta))
-
-        xa = 0
-        ya = sfsa
-        xb = sfsb * numpy.sin(beta)
-        yb = sfsb * numpy.cos(beta)
-
-        self.log.write("Quellkoordinatensystem: a %f %f, b %f %f\n" % (xa,ya,xb,yb))
-
-        Xa, Ya, Za = A
-        Xb, Yb, Zb = B
-        self.log.write("Zeilkoordinatensystem: A %f %f, B %f %f\n" % (Xa,Ya,Xb,Yb))
-
-
-        sab = dist(xa,ya,xb,yb)
-        tab = numpy.arctan((xa-xb)/(ya-yb))
-        self.log.write("Winkel im QKS: %f\n" % tab)
-        Tab = numpy.arctan((Xa-Xb)/(Ya-Yb))
-        self.log.write("Winkel im ZKS: %f\n" % Tab)
-        
-        phi = Tab - tab
-        self.log.write("Rotationswinkel: %f\n" % phi)
-
-        Yfs = Ya - sfsa * numpy.cos(phi)
-        Xfs = Xa - sfsa * numpy.sin(phi)
-        
-        #set tachy position
-        self.setPosition(Xfs, Yfs)
-        self.log.write("Position set to %f %f\n" % (Xfs, Yfs))
-        #set tachy angel
-        a = self.getAngle()
-        self.log.write("Current Angle is %f\n" % a)
-        self.setAngle(a+phi*400/(2*numpy.pi))
-        self.log.write("Angle set to %f\n" % (a+phi))
-        self.log.write("Station set successful.\n")
     
-    def setPosition(self, x, y):
+    def setPosition(self, x, y, z=None):
         self.write("PUT/84...0"+ "%0+17.d \r\n" % (x*10**self.digits["84"])) #easting -> x
         if self.readline().strip() != "?":
             raise TachyError()
         self.write("PUT/85...0"+ "%0+17.d \r\n" % (y*10**self.digits["85"])) #nrothing -> y
         if self.readline().strip() != "?":
             raise TachyError()
+        if not z is None:
+            self.write("PUT/86...0"+ "%0+17.d \r\n" % (z*10**self.digits["86"])) #height -> z
+            if self.readline().strip() != "?":
+                raise TachyError()
             
     def setAngle(self, alpha):
         self.write("PUT/21...2"+ "%0+17.d \r\n" % (alpha*10**self.digits["21"])) #nrothing -> y
@@ -181,7 +139,7 @@ class TachyError(IOError):
 #tachy = TachyConnection("/dev/ttyUSB0")
 #tachy.beep()
 
-bpy.types.Scene.tachy = TachyConnection("COM1")
+bpy.types.Scene.tachy = TachyConnection("/dev/pts/25")
 
 
 class StationPoint1(bpy.types.Operator):
@@ -191,10 +149,13 @@ class StationPoint1(bpy.types.Operator):
     
     def invoke(self, context, event):
         context.scene.tachy.setPosition(0.0, 0.0)
-        bpy.types.Scene.stationPoint1 = bpy.context.scene.objects.active.location
+        bpy.context.scene["stationPoint1"] = bpy.context.scene.objects.active.location
         mes = context.scene.tachy.readMeasurment()
+        print(mes)
         context.scene.tachy.setAngle(0.0)
-        bpy.types.Scene.distStationPoint1 = numpy.cos(mes["vertAngle"])/ mes["slopeDist"]
+        bpy.context.scene["distStationPoint1"] = numpy.cos(mes["vertAngle"]*2*numpy.pi/400)*mes["slopeDist"]
+        bpy.context.scene["vertAngleStationPoint1"] = mes["vertAngle"] *2*numpy.pi/400    
+        bpy.context.scene["reflectorHeightStationPoint1"] = mes["reflectorHeight"]
         return {"FINISHED"}
 
 class StationPoint2(bpy.types.Operator):
@@ -203,10 +164,13 @@ class StationPoint2(bpy.types.Operator):
     bl_options = {"UNDO"}
     
     def invoke(self, context, event):
-        bpy.types.Scene.stationPoint2 = bpy.context.scene.objects.active.location
+        bpy.context.scene["stationPoint2"] = bpy.context.scene.objects.active.location
         mes = context.scene.tachy.readMeasurment()
-        bpy.types.Scene.distStationPoint2 = numpy.cos(mes["vertAngle"])/ mes["slopeDist"]
-        bpy.types.Scene.angleStationPoint2 = mes["hzAngle"]
+        print(mes)
+        bpy.context.scene["distStationPoint2"] = numpy.cos(mes["vertAngle"]*2*numpy.pi/400)*mes["slopeDist"]
+        bpy.context.scene["angleStationPoint2"] = mes["hzAngle"]
+        bpy.context.scene["vertAngleStationPoint2"] = mes["vertAngle"] *2*numpy.pi/400
+        bpy.context.scene["reflectorHeightStationPoint2"] = mes["reflectorHeight"]
         return {"FINISHED"}
 
 class SetStation(bpy.types.Operator):
@@ -215,44 +179,66 @@ class SetStation(bpy.types.Operator):
     bl_options = {"UNDO"}
     
     def invoke(self, context, event):
-        sfsa = context.scene.distStationPoint1
-        sfsb = context.scene.distStationPoint2
-        beta = context.scene.angleStationPoint2*2*numpy.pi/400
-        #self.log.write("Abstand zu A: %f, Abstand zu B: %f, Winkel zu B: %f(rad)\n" % (sfsa, sfsb, beta))
+        sA = context.scene["distStationPoint1"]
+        sB = context.scene["distStationPoint2"]
+        gamma = context.scene["angleStationPoint2"]*2*numpy.pi/400
+        print("Abstand zu A: %f, Abstand zu B: %f, Winkel zu B: %f(rad), %f(gon)\n" % (sA, sB, gamma, gamma*400/(2*numpy.pi)))
 
-        xa = 0
-        ya = sfsa
-        xb = sfsb * numpy.sin(beta)
-        yb = sfsb * numpy.cos(beta)
+        #xa = 0
+        #ya = sfsa
+        #xb = sfsb * numpy.sin(beta)
+        #yb = sfsb * numpy.cos(beta)
 
-        #self.log.write("Quellkoordinatensystem: a %f %f, b %f %f\n" % (xa,ya,xb,yb))
+        #print("Quellkoordinatensystem: a %f %f, b %f %f\n" % (xa,ya,xb,yb))
 
-        Xa, Ya, Za = context.scene.stationPoint1
-        Xb, Yb, Zb = context.scene.stationPoint2
-        #self.log.write("Zeilkoordinatensystem: A %f %f, B %f %f\n" % (Xa,Ya,Xb,Yb))
+        Ya, Xa, Za = context.scene["stationPoint1"]
+        Yb, Xb, Zb = context.scene["stationPoint2"]
+        print("Zeilkoordinatensystem: A %f %f, B %f %f\n" % (Xa,Ya,Xb,Yb))
 
 
-        sab = dist(xa,ya,xb,yb)
-        tab = numpy.arctan((xa-xb)/(ya-yb))
-        #self.log.write("Winkel im QKS: %f\n" % tab)
-        Tab = numpy.arctan((Xa-Xb)/(Ya-Yb))
-        #self.log.write("Winkel im ZKS: %f\n" % Tab)
+        #sab = dist(xa,ya,xb,yb)
+        SAB = dist(Xa, Ya, Xb, Yb) 
+        print("Abstand zwischen A und B:%f" % SAB)
+        #tab = numpy.arctan((xb - xa)/(yb - ya))
+        #print("Winkel im QKS: %f(rad), %f(gon)\n" % (tab, tab * 400/(2*numpy.pi)))
+        tAB = numpy.arctan((Yb - Ya)/(Xb - Xa)) % (2*numpy.pi)
+        print("Winkel im ZKS: %f(rad), %f(gon)\n" % (tAB, tAB*400/(2*numpy.pi)))
         
-        phi = Tab - tab
-        #self.log.write("Rotationswinkel: %f\n" % phi)
+        #phi = Tab - tab
+        print("arccos((%f**2+%f**2-%f**2)/(2*%f*%f))" % (sA,SAB,sB,sA,SAB))
+        print("=arccos(%f)" % ((sA**2+SAB**2-sB**2)/(2*sA*SAB)))
+        alpha = numpy.arccos(min(1, (sA**2+SAB**2-sB**2)/(2*sA*SAB)))
+        print("Alpha: %f(rad), %f(gon)" % (alpha, alpha*400/(2*numpy.pi)))
+        tAS = tAB + alpha
+        print("Rotationswinkel: %f(rad), %f(gon)\n" % (tAS, tAS*400/(2*numpy.pi)))
 
-        Yfs = Ya - sfsa * numpy.cos(phi)
-        Xfs = Xa - sfsa * numpy.sin(phi)
+        #wenn der x wer des zweiten punkts kleiner ist als der des ersten muss man subtrahieren
+        if Xb < Xa:
+            XS = Xa - sA * numpy.cos(tAS)
+            YS = Ya - sA * numpy.sin(tAS)
+        else:
+            XS = Xa + sA * numpy.cos(tAS)
+            YS = Ya + sA * numpy.sin(tAS)
+        
+        Ga = numpy.sin(bpy.context.scene["vertAngleStationPoint1"]) * bpy.context.scene["distStationPoint1"]
+        Gb = numpy.sin(bpy.context.scene["vertAngleStationPoint2"]) * bpy.context.scene["distStationPoint2"]
+
+        print("Computed height difference: %f, %f" % (Ga, Gb))
+        
+        ZS_list = [Za - Ga + bpy.context.scene["reflectorHeightStationPoint1"],
+                   Zb - Gb + bpy.context.scene["reflectorHeightStationPoint2"]]
+        print("Comuted heights: %f, %f" % tuple(ZS_list))
+        ZS = numpy.mean(ZS_list)
         
         #set tachy position
-        context.scene.tachy.setPosition(Xfs, Yfs)
-        #self.log.write("Position set to %f %f\n" % (Xfs, Yfs))
+        context.scene.tachy.setPosition(YS, XS, ZS)
+        print("Position set to %f %f %f\n" % (YS, XS, ZS))
         #set tachy angel
         a = context.scene.tachy.getAngle()
-        #self.log.write("Current Angle is %f\n" % a)
-        context.scene.tachy.setAngle(a+phi*400/(2*numpy.pi))
-        #self.log.write("Angle set to %f\n" % (a+phi))
-        #self.log.write("Station set successful.\n")   
+        print("Current Angle is %f\n" % a)
+        context.scene.tachy.setAngle(a+tAS*400/(2*numpy.pi))
+        print("Angle set to %f\n" % (a+tAS*400/(2*numpy.pi)))
+        print("Station set successful.\n")   
         return {"FINISHED"}
 
 
@@ -278,7 +264,7 @@ class MeasurePoint(bpy.types.Operator):
 
 
 class MeasureNiv(bpy.types.Operator):
-    bl_idname = "mesh.measure_point"
+    bl_idname = "mesh.measure_niv"
     bl_label = "Tachy Panel"
     bl_options = {"UNDO"}
     
@@ -289,16 +275,15 @@ class MeasureNiv(bpy.types.Operator):
         y = measurment["targetNorth"]
         z = measurment["targetHeight"] 
         
-        value1 = bpy.context.scene.CountNiv
-        bpy.context.scene.CountNiv += 1
-        string1 = bpy.context.scene.NivString
-        strval = str(string1)+str(value1)
+        bpy.context.scene.cursor_location = (x, y, z)
+        
+        strval = "%.2f m NN" % z
         bpy.ops.object.text_add()
         ob = bpy.context.object
-        ob.name = (str(strval))
+        ob.name = (strval)
         tcu = ob.data
-        tcu.name = (str(strval))
-        tcu.body = (str(strval))
+        tcu.name = (strval)
+        tcu.body = (strval)
         tcu.font = bpy.data.fonts[0]
         tcu.offset_x = -0.01
         tcu.offset_y = 0.03
@@ -312,8 +297,9 @@ class MeasureNiv(bpy.types.Operator):
         tcu.fill_mode="FRONT"
 
        
-        coords = [[x, y, z], [x-0.016, y+0.024, z], [x+0.016, y+0.024, z]]
+        coords = [[0, 0, 0], [-0.016, 0.024, 0], [0.016, 0.024, 0]]
         faces = [[0,2,1]]
+        
         me = bpy.data.meshes.new("Triangle")
         ob = bpy.data.objects.new("Triangle", me)
         #bpy.context.scene.objects.link(ob)
@@ -377,6 +363,8 @@ class TachyPanel(bpy.types.Panel):
         layout.operator("mesh.station_point2", text="Station Point 2")
         layout = self.layout.column(align=True)
         layout.operator("mesh.set_station", text="Compute Station")
+        layout = self.layout.column(align=True)
+        layout.operator("mesh.measure_niv", text="Measure Nivellemnet")
         
 
 
