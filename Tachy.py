@@ -157,7 +157,7 @@ class StationPoint1(bpy.types.Operator):
         mes = context.scene.tachy.readMeasurment()
         print(mes)
         context.scene.tachy.setAngle(0.0)
-        bpy.context.scene["distStationPoint1"] = numpy.cos(numpy.pi - mes["vertAngle"]*2*numpy.pi/400)*mes["slopeDist"]
+        bpy.context.scene["distStationPoint1"] = numpy.cos(mes["vertAngle"]*2*numpy.pi/400 - numpy.pi)*mes["slopeDist"]
         bpy.context.scene["vertAngleStationPoint1"] = mes["vertAngle"] *2*numpy.pi/400    
         bpy.context.scene["reflectorHeightStationPoint1"] = mes["reflectorHeight"]
         return {"FINISHED"}
@@ -171,7 +171,7 @@ class StationPoint2(bpy.types.Operator):
         bpy.context.scene["stationPoint2"] = bpy.context.scene.objects.active.location
         mes = context.scene.tachy.readMeasurment()
         print(mes)
-        bpy.context.scene["distStationPoint2"] = numpy.cos(numpy.pi - mes["vertAngle"]*2*numpy.pi/400)*mes["slopeDist"]
+        bpy.context.scene["distStationPoint2"] = numpy.cos(mes["vertAngle"]*2*numpy.pi/400 - numpy.pi)*mes["slopeDist"]
         bpy.context.scene["angleStationPoint2"] = mes["hzAngle"]
         bpy.context.scene["vertAngleStationPoint2"] = mes["vertAngle"] *2*numpy.pi/400
         bpy.context.scene["reflectorHeightStationPoint2"] = mes["reflectorHeight"]
