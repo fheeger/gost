@@ -70,7 +70,11 @@ class TachyConnection:
         self.log = log
 
     def __del__(self):
-        self.port.close()
+        try:
+            self.port.close()
+        except AttributeError:
+            #port does not exist or was not open anyway
+            pass
         
     def readline(self):
         data = self.port.readline().decode("ascii")
