@@ -224,8 +224,8 @@ class SetStation(bpy.types.Operator):
             XS = Xa + sA * numpy.cos(tAS)
             YS = Ya + sA * numpy.sin(tAS)
         
-        Ga = numpy.sin(numpy.pi - bpy.context.scene["vertAngleStationPoint1"]) * bpy.context.scene["distStationPoint1"]
-        Gb = numpy.sin(numpy.pi - bpy.context.scene["vertAngleStationPoint2"]) * bpy.context.scene["distStationPoint2"]
+        Ga = numpy.sin(bpy.context.scene["vertAngleStationPoint1"] - numpy.pi/2) * bpy.context.scene["distStationPoint1"]
+        Gb = numpy.sin(bpy.context.scene["vertAngleStationPoint2"] - numpy.pi/2) * bpy.context.scene["distStationPoint2"]
 
         print("Computed height difference: %f, %f" % (Ga, Gb))
         
