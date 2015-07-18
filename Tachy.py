@@ -143,7 +143,7 @@ class TachyError(IOError):
 #tachy = TachyConnection("/dev/ttyUSB0")
 #tachy.beep()
 
-bpy.types.Scene.tachy = TachyConnection("/dev/pts/25")
+bpy.types.Scene.tachy = TachyConnection("/dev/ttyUSB0")
 
 
 class StationPoint1(bpy.types.Operator):
@@ -238,10 +238,11 @@ class SetStation(bpy.types.Operator):
         context.scene.tachy.setPosition(YS, XS, ZS)
         print("Position set to %f %f %f\n" % (YS, XS, ZS))
         #set tachy angel
-        a = context.scene.tachy.getAngle()
-        print("Current Angle is %f\n" % a)
-        context.scene.tachy.setAngle(a+tAS*400/(2*numpy.pi))
-        print("Angle set to %f\n" % (a+tAS*400/(2*numpy.pi)))
+        r = numpy.arcsin((Yb-YS)/sB) % (2*numpy.pi)
+        #a = context.scene.tachy.getAngle()
+        #print("Current Angle is %f\n" % a)
+        context.scene.tachy.setAngle(r*400/(2*numpy.pi))
+        print("Angle set to %f\n" % (r*400/(2*numpy.pi)))
         print("Station set successful.\n")   
         return {"FINISHED"}
 
