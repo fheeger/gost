@@ -58,7 +58,7 @@ class SelectPortOperator(bpy.types.Operator):
         return not bpy.types.Scene.tachy.connected
     
     def avail_ports(self, context):
-        if sys.platform[:2] == "win":
+        if sys.platform[:3] == "win":
             possible = ["COM%i" % i for i in range(1,255)]
         else:
             possible = glob("/dev/tty[a-zA-Z]*")
