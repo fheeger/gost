@@ -70,7 +70,7 @@ class SelectPortOperator(bpy.types.Operator):
                 pass
             else:
                 ports.append(p)
-        names = ports + ["/dev/pts/15"]
+        names = ports + ["/dev/pts/18"]
         ids = ["p%i" % i for i in range(len(names))] 
         descriptions = names
         return list(zip(ids, names, descriptions))
@@ -215,13 +215,13 @@ class MeasurePoints(bpy.types.Operator):
             return False
         if not "tachyPosition" in bpy.context.scene:
             return False
-        num_selected_vert = 0
+        #num_selected_vert = 0
         
-        for v in bmesh.from_edit_mesh(bpy.context.active_object.data).verts :
-            if v.select:
-                num_selected_vert += 1
-        if num_selected_vert != 1:
-            return False
+        #for v in bmesh.from_edit_mesh(bpy.context.active_object.data).verts :
+        #    if v.select:
+        #        num_selected_vert += 1
+        #if num_selected_vert != 1:
+        #    return False
         return True
     
     def invoke(self, context, event):
@@ -244,18 +244,29 @@ class MeasurePoints(bpy.types.Operator):
         try:
             measurement = context.scene.tachy.readMeasurement(0.1)
             if measurement is None:
-                print("No measurement")
+                #print("No measurement")
                 return {"RUNNING_MODAL"}
             else:
                 print(measurement)
                 x = measurement["targetEast"]
                 y = measurement["targetNorth"]
                 z = measurement["targetHeight"] 
-                bpy.ops.mesh.extrude_region_move(MESH_OT_extrude_region={"mirror":False}, TRANSFORM_OT_translate={"value":(0, 0, 0), "constraint_axis":(False, False, False), "constraint_orientation":'GLOBAL', "mirror":False, "proportional":'DISABLED', "proportional_edit_falloff":'SMOOTH', "proportional_size":1, "snap":False, "snap_target":'CLOSEST', "snap_point":(0, 0, 0), "snap_align":False, "snap_normal":(0, 0, 0), "gpencil_strokes":False, "texture_space":False, "remove_on_cancel":False, "release_confirm":False})
-                bpy.context.scene.cursor_location = (x, y, z)
                 bpy.context.area.type='VIEW_3D'
-                bpy.ops.view3d.snap_selected_to_cursor(use_offset=False)
-                #bpy.context.area.type='TEXT_EDITOR'
+                if len(bpy.context.selected_objects) == 0:
+                    bpy.ops.mesh.primitive_plane_add(view_align=False, enter_editmode=False, location=(x, y, z))
+                    bpy.ops.object.mode_set(mode='EDIT')
+                    bpy.ops.mesh.delete(type="VERT")
+                    bpy.ops.object.mode_set(mode='OBJECT')
+                    mesh = bpy.context.active_object
+                    mesh.data.vertices.add(1)
+                    mesh.data.vertices[0].co = (0, 0, 0)
+                else:
+                    bpy.ops.object.mode_set(mode='EDIT')
+                    bpy.ops.mesh.extrude_region_move(MESH_OT_extrude_region={"mirror":False}, TRANSFORM_OT_translate={"value":(0, 0, 0), "constraint_axis":(False, False, False), "constraint_orientation":'GLOBAL', "mirror":False, "proportional":'DISABLED', "proportional_edit_falloff":'SMOOTH', "proportional_size":1, "snap":False, "snap_target":'CLOSEST', "snap_point":(0, 0, 0), "snap_align":False, "snap_normal":(0, 0, 0), "gpencil_strokes":False, "texture_space":False, "remove_on_cancel":False, "release_confirm":False})
+                    bpy.context.scene.cursor_location = (x, y, z)
+                    bpy.context.area.type='VIEW_3D'
+                    bpy.ops.view3d.snap_selected_to_cursor(use_offset=False)
+                    #bpy.context.area.type='TEXT_EDITOR'
                 return {"RUNNING_MODAL"}
         except TachyError:
             self.report({"ERROR"}, "Error in tachy communication")
@@ -341,7 +352,7 @@ class MeasurePanel(bpy.types.Panel):
 
     def draw(self, context):
         layout = self.layout.column(align=True)
-        layout.operator("tachy.measure_points", text="Measure Points")
+        layout.operator("tachy.measure_points", text="Measure Poly Line")
         
 
 
@@ -362,6 +373,8 @@ class TachyPanel(bpy.types.Panel):
         layout.operator("tachy.set_station", text="Compute Station")
         layout = self.layout.column(align=True)
         layout.operator("tachy.measure_niv", text="Measure Nivellemnet")
+        layout = self.layout.column(align=True)        
+        layout.operator("tachy.measure_points", text="Measure Poly Line")
         
 
 
