@@ -1,5 +1,5 @@
 bl_info = {
-    "name": "GeO Survey Tool",
+    "name": "GOST: GeO Survey Tool",
     "author": "Lukas Fischer, Felix Heeger",
     "blender": (2, 70, 0),
     "location": "",
@@ -99,7 +99,7 @@ class StationPoint1(bpy.types.Operator):
     def execute(self, context):
         context.scene.tachy.setPosition(0.0, 0.0)
         bpy.context.scene["stationPoint1"] = bpy.context.scene.objects.active.location
-        mes = context.scene.tachy.readMeasurment()
+        mes = context.scene.tachy.readMeasurement()
         print(mes)
         context.scene.tachy.setAngle(0.0)
         bpy.context.scene["distStationPoint1"] = numpy.cos(gon2rad(mes["vertAngle"]) - numpy.pi/2)*mes["slopeDist"]
@@ -118,7 +118,7 @@ class StationPoint2(bpy.types.Operator):
     
     def invoke(self, context, event):
         bpy.context.scene["stationPoint2"] = bpy.context.scene.objects.active.location
-        mes = context.scene.tachy.readMeasurment()
+        mes = context.scene.tachy.readMeasurement()
         print(mes)
         bpy.context.scene["distStationPoint2"] = numpy.cos(gon2rad(mes["vertAngle"]) - numpy.pi/2)*mes["slopeDist"]
         bpy.context.scene["angleStationPoint2"] = mes["hzAngle"]
@@ -177,13 +177,15 @@ class SetStation(bpy.types.Operator):
             XS = Xa + sA * numpy.cos(tAS)
             YS = Ya + sA * numpy.sin(tAS)
         
-        Ga = numpy.sin(bpy.context.scene["vertAngleStationPoint1"] - numpy.pi/2) * bpy.context.scene["distStationPoint1"]
-        Gb = numpy.sin(bpy.context.scene["vertAngleStationPoint2"] - numpy.pi/2) * bpy.context.scene["distStationPoint2"]
+        Ga = numpy.sin(numpy.pi/2 - bpy.context.scene["vertAngleStationPoint1"]) * bpy.context.scene["distStationPoint1"]
+        Gb = numpy.sin(numpy.pi/2 - bpy.context.scene["vertAngleStationPoint2"]) * bpy.context.scene["distStationPoint2"]
 
         print("Computed height difference: %f, %f" % (Ga, Gb))
         
-        ZS_list = [Za - Ga + bpy.context.scene["reflectorHeightStationPoint1"],
-                   Zb - Gb + bpy.context.scene["reflectorHeightStationPoint2"]]
+        instrHeight = context.scene.tachy.getInstrumentHeight()
+        
+        ZS_list = [Za - Ga + bpy.context.scene["reflectorHeightStationPoint1"] - instrHeight,
+                   Zb - Gb + bpy.context.scene["reflectorHeightStationPoint2"] - instrHeight]
         print("Comuted heights: %f, %f" % tuple(ZS_list))
         ZS = numpy.mean(ZS_list)
         
@@ -223,7 +225,7 @@ class MeasurePoints(bpy.types.Operator):
         return True
     
     def invoke(self, context, event):
-        print("start measurment")
+        print("start measurement")
         print(context.window_manager.modal_handler_add(self))
         self._timer = context.window_manager.event_timer_add(1, context.window)
         
@@ -231,7 +233,7 @@ class MeasurePoints(bpy.types.Operator):
     
     def modal(self, context, event):
         if event.type == "ESC":
-            print("stopping measurment")
+            print("stopping measurement")
             context.window_manager.event_timer_remove(self._timer)
             return {"FINISHED"}
         elif event.type == "TIMER":
@@ -240,15 +242,15 @@ class MeasurePoints(bpy.types.Operator):
     
     def execute(self, context):
         try:
-            measurment = context.scene.tachy.readMeasurementNonBlocking(0.1)
-            if measurment is None:
-                print("No measurment")
+            measurement = context.scene.tachy.readMeasurement(0.1)
+            if measurement is None:
+                print("No measurement")
                 return {"RUNNING_MODAL"}
             else:
-                print(measurment)
-                x = measurment["targetEast"]
-                y = measurment["targetNorth"]
-                z = measurment["targetHeight"] 
+                print(measurement)
+                x = measurement["targetEast"]
+                y = measurement["targetNorth"]
+                z = measurement["targetHeight"] 
                 bpy.ops.mesh.extrude_region_move(MESH_OT_extrude_region={"mirror":False}, TRANSFORM_OT_translate={"value":(0, 0, 0), "constraint_axis":(False, False, False), "constraint_orientation":'GLOBAL', "mirror":False, "proportional":'DISABLED', "proportional_edit_falloff":'SMOOTH', "proportional_size":1, "snap":False, "snap_target":'CLOSEST', "snap_point":(0, 0, 0), "snap_align":False, "snap_normal":(0, 0, 0), "gpencil_strokes":False, "texture_space":False, "remove_on_cancel":False, "release_confirm":False})
                 bpy.context.scene.cursor_location = (x, y, z)
                 bpy.context.area.type='VIEW_3D'
@@ -265,11 +267,11 @@ class MeasureNiv(bpy.types.Operator):
     bl_options = {"UNDO"}
     
     def invoke(self, context, event):
-        measurment = context.scene.tachy.readMeasurment()
-        print(measurment)
-        x = measurment["targetEast"]
-        y = measurment["targetNorth"]
-        z = measurment["targetHeight"] 
+        measurement = context.scene.tachy.readMeasurement()
+        print(measurement)
+        x = measurement["targetEast"]
+        y = measurement["targetNorth"]
+        z = measurement["targetHeight"] 
         
         bpy.context.scene.cursor_location = (x, y, z)
         
@@ -316,11 +318,11 @@ class MeasureCheckpoint(bpy.types.Operator):
     bl_options = {"UNDO"}
     
     def invoke(self, context, event):
-        measurment = context.scene.tachy.readMeasurment()
-        print(measurment)
-        x = measurment["targetEast"]
-        y = measurment["targetNorth"]
-        z = measurment["targetHeight"] 
+        measurement = context.scene.tachy.readMeasurement()
+        print(measurement)
+        x = measurement["targetEast"]
+        y = measurement["targetNorth"]
+        z = measurement["targetHeight"] 
         bpy.ops.mesh.extrude_region_move(MESH_OT_extrude_region={"mirror":False}, TRANSFORM_OT_translate={"value":(0, 0, 0), "constraint_axis":(False, False, False), "constraint_orientation":'GLOBAL', "mirror":False, "proportional":'DISABLED', "proportional_edit_falloff":'SMOOTH', "proportional_size":1, "snap":False, "snap_target":'CLOSEST', "snap_point":(0, 0, 0), "snap_align":False, "snap_normal":(0, 0, 0), "gpencil_strokes":False, "texture_space":False, "remove_on_cancel":False, "release_confirm":False})
         bpy.context.scene.cursor_location = (x, y, z)
         bpy.context.area.type='VIEW_3D'

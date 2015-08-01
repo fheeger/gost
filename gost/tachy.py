@@ -13,6 +13,7 @@ class TachyConnection:
              "81": "targetEast",
              "82": "targetNorth",
              "83": "targetHeight",
+             "88": "instrumentHeight",
              "87": "reflectorHeight",
              }
              
@@ -25,6 +26,7 @@ class TachyConnection:
               "84": 3,
               "85": 3,
               "86": 3,
+              "88": 3,
               "87": 3,
               }
 
@@ -80,22 +82,6 @@ class TachyConnection:
         self.log.write("WRITE: %s\n" % d)
         self.port.write(d)
 
-    def readMeasurment(self):
-        data_point = {}
-        mStr = self.readline()[1:].strip()
-        lines = mStr.split(" ")
-        for line in lines:
-            word_index = line[0:2]
-            data_info = line[3:6]
-            data = line[6:]
-            if word_index in self.digits:
-                data_point[self.codes[word_index]] = float(data)/10**self.digits[word_index]
-            else:
-                data_point[self.codes[word_index]] = data
-        if self.readline().strip() != "w":
-            raise TachyError()
-        self.write("OK\r\n")
-        return data_point
     
     def readMeasurement(self, timeout=None):
         if self.port is None:
@@ -151,6 +137,15 @@ class TachyConnection:
     def getAngle(self):
         self.write("GET/M/WI21\r\n")
         
+        line = self.readline().strip()
+        if line[0] != "*":
+            raise TachyError()
+        word_index = line[1:3]
+        data = line[-17:]
+        return float(data)/10**self.digits[word_index]
+    
+    def getInstrumentHeight(self):
+        self.write("GET/M/WI88\r\n")  
         line = self.readline().strip()
         if line[0] != "*":
             raise TachyError()
