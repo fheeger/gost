@@ -232,13 +232,6 @@ class MeasurePoints(bpy.types.Operator):
             return False
         if not "tachyPosition" in bpy.context.scene:
             return False
-        #num_selected_vert = 0
-        
-        #for v in bmesh.from_edit_mesh(bpy.context.active_object.data).verts :
-        #    if v.select:
-        #        num_selected_vert += 1
-        #if num_selected_vert != 1:
-        #    return False
         return True
     
     def invoke(self, context, event):
@@ -253,6 +246,16 @@ class MeasurePoints(bpy.types.Operator):
             print("stopping measurement")
             context.window_manager.event_timer_remove(self._timer)
             return {"FINISHED"}
+        elif event.type == "S" or event.type == "C":
+            #close
+            print("close line")
+            self.close_line()
+            return {"RUNNING_MODAL"}
+        elif event.type == "U" or event.type == "B":
+            #break
+            print("break line")
+            self.break_line()
+            return {"RUNNING_MODAL"}
         elif event.type == "TIMER":
             return self.execute(context)
         return {"PASS_THROUGH"}
@@ -270,6 +273,9 @@ class MeasurePoints(bpy.types.Operator):
                 z = measurement["targetHeight"] 
                 bpy.context.area.type='VIEW_3D'
                 if len(bpy.context.selected_objects) == 0:
+                    self.report({"INFO"}, "Starting new mesh")
+                    if bpy.context.mode != "OBJECT":
+                        bpy.ops.object.mode_set(mode='OBJECT')
                     bpy.ops.mesh.primitive_plane_add(view_align=False, enter_editmode=False, location=(x, y, z))
                     bpy.ops.object.mode_set(mode='EDIT')
                     bpy.ops.mesh.delete(type="VERT")
@@ -288,6 +294,41 @@ class MeasurePoints(bpy.types.Operator):
         except TachyError:
             self.report({"ERROR"}, "Error in tachy communication")
 
+    def close_line(self):
+        if bpy.context.mode != "EDIT":
+                bpy.ops.object.mode_set(mode='EDIT')
+        b = bmesh.from_edit_mesh(bpy.context.active_object.data)
+        #unselect all vertices
+        for v in b.verts:
+            v.select = False
+        #select first and last vertex
+        b.verts.ensure_lookup_table()
+        b.verts[0].select = True
+        b.verts[-1].select = True
+        #add edge between them
+        bpy.ops.mesh.edge_face_add()
+        #mark edeges for freestyle render
+        bpy.ops.mesh.mark_freestyle_edge(clear=False)
+        #fill
+        bpy.ops.mesh.fill()
+        bpy.ops.object.mode_set(mode='OBJECT')
+        #make shading smooth
+        bpy.ops.object.shade_smooth()
+        #unselect the object so the next measurment starts a new mesh
+        bpy.context.object.select = False
+        
+    def break_line(self):
+        b = bmesh.from_edit_mesh(bpy.context.active_object.data)
+        #unselect all vertices
+        for v in b.verts:
+            v.select = False
+        #select first and last vertex
+        b.verts[0].select = True
+        b.verts[-1].select = True
+        #add edge between them
+        bpy.ops.mesh.edge_face_add()
+        b.verts[0].select = False
+        b.verts[-1].select = False
 
 class MeasureNiv(bpy.types.Operator):
     bl_idname = "tachy.measure_niv"
