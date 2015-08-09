@@ -17,8 +17,8 @@
 
 import numpy
 
-def dist(x1,y1,x2,y2):
-    return numpy.sqrt((x2-x1)**2+(y2-y1)**2)
+def dist(p1, p2):
+    return numpy.sqrt((p1[0]-p2[0])**2+(p1[1]-p2[1])**2)
 
 def delta(x,y):
     return numpy.abs(x-y)
