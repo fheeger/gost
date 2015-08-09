@@ -28,6 +28,7 @@ class Tachy:
              "82": "targetNorth",
              "83": "targetHeight",
              "87": "reflectorHeight",
+             "88": "instrumentHeight",
          }
              
     digits = {"21": 5,
@@ -38,6 +39,9 @@ class Tachy:
               "83": 3,
               "84": 3,
               "85": 3,
+              "86": 3,
+              "87": 3,
+              "88": 3,
               }
 
     def __init__(self, dev, baut=4800, log=sys.stderr):
@@ -48,20 +52,23 @@ class Tachy:
         self.vertAngle = 0.0
         self.x = 3.5
         self.y = 1.4
+        self.z = 1.0
+        self.instrumentHeight=1.7
+        
     
     def readline(self):
-        line = self.port.readline()
+        line = self.port.readline().decode("ascii")
         self.log.write("READ LINE: %s" % line)
         return line
         
     def write(self, data):
         self.log.write("WRITE: %s" % data)
-        self.port.write(data)
+        self.port.write(bytes(data, "ascii"))
         
     def read(self, bytes=1, timeout=None):
         if not timeout is None:
             self.port.timeout = timeout
-        data = self.port.read(bytes)
+        data = self.port.read(bytes).decode("ascii")
         self.log.write("READ: %s\n" % data)
         return data
         
@@ -104,6 +111,8 @@ class Tachy:
         if comArr[0] == "GET":
             if comArr[2] == "WI21":
                 self.write("*21.322%0+17.d\r\n" % self.hzAngle)
+            elif comArr[2] == "WI88":
+                self.write("*88.322%0+17.d\r\n" % self.instrumentHeight)
             else:
                 self.write("@W127\r\n")
         elif comArr[0] == "PUT":
