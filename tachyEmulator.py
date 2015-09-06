@@ -146,5 +146,18 @@ class Tachy:
     def sPoint4(self):
         self.anyPoint(1,1,1,1,123.87,8.92,17.9)
         
-    
+    def fstStPoint(self, dist, vert=100):
+        self.wait()
+        self.wait()
+        self.anyPoint(1,1,1,1,1,vert=vert, dist=dist)
+        self.stPointNr=1
+        self.wait()
+        
+    def addStPoint(self, dist, angle, vert=100):
+        self.stPointNr += 1
+        self.anyPoint(self.stPointNr, 1, 1, 1, angle, vert=vert, dist=dist)
+        
+    def computeStation(self):
+        for i in range(5):
+            self.wait()
 
