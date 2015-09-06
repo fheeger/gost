@@ -179,44 +179,85 @@ class TachyConnection:
         self.stationPointVAngle.append(gon2rad(mes["vertAngle"]))
         self.stationPointReflectorH.append(mes["reflectorHeight"])
 
-    def computeHorizontalPositionAndAngle(self, a, b):
-        sA = self.stationPointDist[a]
-        sB = self.stationPointDist[b]
-        gamma = self.stationPointHAngle[b]
-        self.log.write("Distance to A: %f\nDistance to B: %f\n Angle to B: %f(rad) %f(gon)\n" % (sA, sB, gamma, rad2gon(gamma)))
-
-
-        Ya, Xa, Za = self.stationPoint[a]
-        Yb, Xb, Zb = self.stationPoint[b]
-        self.log.write("real coordinates\n\tPoint A: %f %f %f\n\tPoint B: %f %f %f\n" % (Ya, Xa, Za, Yb, Xb, Zb))
-
-        sAB = dist(self.stationPoint[a], self.stationPoint[b]) 
-        self.log.write("Distance between A and B: %f\n" % sAB)
-
-        tAB = numpy.arctan((Yb - Ya)/(Xb - Xa)) % (2*numpy.pi)
-        self.log.write("Angle between sAB and the X axis: %f(rad), %f(gon)\n" % (tAB, rad2gon(tAB)))
+    def computeHorizontalPositionAndAngle(self):
+        #number of points
+        n = len(self.stationPoint)
+        #extract coordinates in target co-system
+        X = numpy.array([p[0] for p in self.stationPoint])
+        Y = numpy.array([p[1] for p in self.stationPoint])
+        self.log.write("Coordinates in target co-system:\n")
+        for i in range(n):
+            self.log.write("\tX:%f, Y:%f\n" % (X[i], Y[i]))
+        #compute coordinates in source co-system
+        x = numpy.array([0.0]*n)
+        y = numpy.array([0.0]*n)
+        for p in range(n):
+            x[p] = self.stationPointDist[p] * numpy.sin(self.stationPointHAngle[p])
+            y[p] = self.stationPointDist[p] * numpy.cos(self.stationPointHAngle[p])
+        self.log.write("Coordinates in source co-system:\n")
+        for i in range(n):
+            self.log.write("\tx:%f, y:%f\n" % (x[i], y[i]))
+        #compute center in both co-sys
+        self.log.write("Center of Mass\n")
+        #source co-sys
+        x_s = numpy.sum(x)/n
+        y_s = numpy.sum(y)/n
+        self.log.write("\tsource co-sys: x_s:%f, y_s:%f\n" % (x_s, y_s))
+        #target co-sys
+        X_s = numpy.sum(X)/n
+        Y_s = numpy.sum(Y)/n
+        self.log.write("\ttarget co-sys: X_s:%f, Y_s:%f\n" % (X_s, Y_s))
+        #reduction onto the center
+        x_bar = x - x_s
+        y_bar = y - y_s
+        self.log.write("Reduced coordinates in source co-system:\n")
+        for i in range(n):
+            self.log.write("\tx_bar:%f, y_bar:%f\n" % (x_bar[i], y_bar[i]))
+        X_bar = X - X_s
+        Y_bar = Y - Y_s
+        self.log.write("Reduced coordinates in target co-system:\n")
+        for i in range(n):
+            self.log.write("\tX_bar:%f, X_bar:%f\n" % (X_bar[i], Y_bar[i]))
+        #compute transforamtion parameters
+        self.log.write("Transformation parameters:\n")
+        N = (numpy.sum(x_bar**2) * numpy.sum(y_bar**2)) - (numpy.sum(x_bar*y_bar))**2
         
-        alpha = numpy.arccos(min(1, (sA**2+sAB**2-sB**2)/(2*sA*sAB)))
-        self.log.write("Alpha: %f(rad), %f(gon)\n" % (alpha, rad2gon(alpha)))
-        tAS = tAB + alpha
-        self.log.write("tAS: %f(rad), %f(gon)\n" % (tAS, rad2gon(tAS)))
-
-        #wenn der x wer des zweiten punkts kleiner ist als der des ersten muss man subtrahieren
-        if Xb < Xa:
-            XS = Xa - sA * numpy.cos(tAS)
-            YS = Ya - sA * numpy.sin(tAS)
-        else:
-            XS = Xa + sA * numpy.cos(tAS)
-            YS = Ya + sA * numpy.sin(tAS)
+        a1 = (numpy.sum(x_bar*X_bar) * numpy.sum(y_bar**2) - numpy.sum(y_bar*X_bar) * numpy.sum(x_bar*y_bar)) / N
+        a2 = (numpy.sum(x_bar*X_bar) * numpy.sum(x_bar*y_bar) - numpy.sum(y_bar*X_bar) * numpy.sum(x_bar**2)) / N
+        a3 = (numpy.sum(y_bar*Y_bar) * numpy.sum(x_bar**2) - numpy.sum(x_bar*Y_bar) * numpy.sum(x_bar*y_bar)) / N
+        a4 = (numpy.sum(x_bar*Y_bar) * numpy.sum(y_bar**2) - numpy.sum(y_bar*Y_bar) * numpy.sum(x_bar*y_bar)) / N
         
-        if Ya > YS:
-            tASN = tAS - numpy.pi
-        else:
-            tASN = tAS + numpy.pi
-        tX = self.getAngle()
-        hzAngle = (tASN + tX) % (2*numpy.pi)
-            
-        return (YS, XS), hzAngle
+        Y0 = Y_s - a3*y_s - a4*x_s
+        X0 = X_s - a1*x_s + a2*y_s
+        
+        self.log.write("\ta1: %f\n" % a1)
+        self.log.write("\ta2: %f\n" % a2)
+        self.log.write("\ta3: %f\n" % a3)
+        self.log.write("\ta3: %f\n" % a3)
+        
+        self.log.write("\tX0: %f\n" % X0)
+        self.log.write("\tY0: %f\n" % Y0)
+        #computation of rotation angles
+        self.log.write("Rotation Angles:\n")
+        #abszisse, x-axis
+        alpha = numpy.arctan(a4/a1)
+        #ordinate, y-axis
+        beta = numpy.arctan(a2/a3)
+        self.log.write("\talpha: %f gon\n" % rad2gon(alpha))
+        self.log.write("\tbeta: %f gon\n" % rad2gon(beta))
+        
+        #compute scales
+        m1 = numpy.sqrt(a1**2 + a4**2)
+        m2 = numpy.sqrt(a2**2 + a3**2)
+        
+        #errors
+        W_Y = -Y0 - a3*y - a4*x + Y
+        W_X = -X0 - a1*x + a2*y + X
+        
+        #precission
+        s = numpy.sqrt((numpy.sum(W_X*W_X) + numpy.sum(W_X*W_Y)) / (2*n - 6))
+        
+        return (Y0, X0), beta, s
         
     def computeHeight(self, a):
         g = numpy.sin(numpy.pi/2 - self.stationPointVAngle[a]) * self.stationPointDist[a]
@@ -229,25 +270,15 @@ class TachyConnection:
         
     
     def computeStation(self):
-        pos_list = []
-        angle_list = []
-        for b in range(1, len(self.stationPoint)):
-            (x, y), angle = self.computeHorizontalPositionAndAngle(0, b)
-            z = self.computeHeight(b)
-            pos_list.append((x, y, z))
-            angle_list.append(angle)
-        final_pos = (numpy.mean([point[0] for point in pos_list]),
-                     numpy.mean([point[1] for point in pos_list]),
-                     numpy.mean([point[2] for point in pos_list]),
-                    )
-        final_angle = numpy.mean(angle_list)
-        error = [dist(final_pos, point) for point in pos_list]
-        self.log.write("Position errors:\n\t" + "\n\t".join(map(str, error)) + "\n")
-        return final_pos, final_angle#, error
+        (x, y), rotation, error = self.computeHorizontalPositionAndAngle()
+        z = self.computeHeight(0)
+        self.log.write("Position error: %f\n" % error)
+        return (x, y, z), rotation#, error
         
     def setStation(self, p, a):
         self.setPosition(p[0], p[1], p[2])
-        self.setAngle(a)
+        currentAngle = self.getAngle()
+        self.setAngle(currentAngle + rad2gon(rotation))
         self.stationed = True
             
     
