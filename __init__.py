@@ -124,7 +124,7 @@ class SetStation(bpy.types.Operator):
     @classmethod
     def poll(cls, context):
         return bpy.types.Scene.tachy.connected \
-               and len(context.scene.tachy.stationPoint) > 1
+               and len(context.scene.tachy.stationPoint) > 2
 
     #def getStationPoints(self, context):
     #    pos, errors = bpy.types.Scene.tachy.computeStation()
@@ -153,10 +153,10 @@ class MeasurePoints(bpy.types.Operator):
     def poll(cls, context):
         if not bpy.types.Scene.tachy.connected:
             return False
-        if not "tachyPosition" in bpy.context.scene:
+        if not bpy.types.Scene.tachy.stationed:
             return False
+
         num_selected_vert = 0
-        
         for v in bmesh.from_edit_mesh(bpy.context.active_object.data).verts :
             if v.select:
                 num_selected_vert += 1
