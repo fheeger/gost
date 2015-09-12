@@ -146,6 +146,15 @@ class TachyConnection:
         data = line[-17:]
         return float(data)/10**self.digits[word_index]
 
+    def getReflectorHeight(self):
+        self.write("GET/M/WI87\r\n")  
+        line = self.readline().strip()
+        if line[0] != "*":
+            raise TachyError()
+        word_index = line[1:3]
+        data = line[-17:]
+        return float(data)/10**self.digits[word_index]
+
     def getInstrumentHeight(self):
         self.write("GET/M/WI88\r\n")  
         line = self.readline().strip()
@@ -169,7 +178,10 @@ class TachyConnection:
         self.stationPointDist = [numpy.cos(gon2rad(mes["vertAngle"]) - numpy.pi/2)*mes["slopeDist"] ]
         self.stationPointHAngle = [0.0]
         self.stationPointVAngle = [ gon2rad(mes["vertAngle"]) ]
-        self.stationPointReflectorH = [ mes["reflectorHeight"] ]
+        try:
+            self.stationPointReflectorH = [ mes["reflectorHeight"] ]
+        except KeyError:
+            self.stationPointReflectorH = [self.getReflectorHeight()]
         
     def stationPointN(self, p):
         self.stationPoint.append(p)
@@ -177,7 +189,10 @@ class TachyConnection:
         self.stationPointDist.append(numpy.cos(gon2rad(mes["vertAngle"]) - numpy.pi/2)*mes["slopeDist"])
         self.stationPointHAngle.append(gon2rad(mes["hzAngle"]))
         self.stationPointVAngle.append(gon2rad(mes["vertAngle"]))
-        self.stationPointReflectorH.append(mes["reflectorHeight"])
+        try:
+            self.stationPointReflectorH.append(mes["reflectorHeight"])
+        except KeyError:
+            self.stationPointReflectorH.append(self.getReflectorHeight())
 
     def computeHorizontalPositionAndAngle(self):
         #number of points
@@ -253,9 +268,13 @@ class TachyConnection:
         #errors
         W_Y = -Y0 - a3*y - a4*x + Y
         W_X = -X0 - a1*x + a2*y + X
+        self.log.write("Errors:\n")
+        for i in range(len(W_X)):
+            self.log.write("\tW_X[%i]: %f, W_Y[%i]: %f\n" % (i, W_X[i], i, W_Y[i]))
         
         #precission
         s = numpy.sqrt((numpy.sum(W_X*W_X) + numpy.sum(W_X*W_Y)) / (2*n - 6))
+        self.log.write("Precission: %f\n" % s)
         
         return (Y0, X0), beta, s
         
@@ -278,7 +297,7 @@ class TachyConnection:
     def setStation(self, p, a):
         self.setPosition(p[0], p[1], p[2])
         currentAngle = self.getAngle()
-        self.setAngle(currentAngle + rad2gon(rotation))
+        self.setAngle((currentAngle - rad2gon(a)) % 400)
         self.stationed = True
             
     
