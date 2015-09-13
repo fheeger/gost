@@ -18,6 +18,7 @@
 import sys
 
 import serial
+import numpy
 
 class Tachy:
     codes = {"11": "ptid",
@@ -110,9 +111,9 @@ class Tachy:
         print(comArr)
         if comArr[0] == "GET":
             if comArr[2] == "WI21":
-                self.write("*21.322%0+17.d\r\n" % self.hzAngle)
+                self.write("*21.322%0+17.d\r\n" % (self.hzAngle * 10**5))
             elif comArr[2] == "WI88":
-                self.write("*88.322%0+17.d\r\n" % self.instrumentHeight)
+                self.write("*88.322%0+17.d\r\n" % (self.instrumentHeight * 10**3))
             else:
                 self.write("@W127\r\n")
         elif comArr[0] == "PUT":
@@ -156,6 +157,7 @@ class Tachy:
     def addStPoint(self, dist, angle, vert=100):
         self.stPointNr += 1
         self.anyPoint(self.stPointNr, 1, 1, 1, angle, vert=vert, dist=dist)
+        self.hzAngle = angle
         
     def computeStation(self):
         for i in range(6):
