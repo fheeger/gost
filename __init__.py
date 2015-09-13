@@ -70,7 +70,7 @@ class SelectPortOperator(bpy.types.Operator):
                 pass
             else:
                 ports.append(p)
-        names = ports + ["/dev/pts/7"]
+        names = ports + ["/dev/pts/5"]
         ids = ["p%i" % i for i in range(len(names))] 
         descriptions = names
         return list(zip(ids, names, descriptions))
@@ -182,7 +182,7 @@ class MeasurePoints(bpy.types.Operator):
     
     def execute(self, context):
         try:
-            measurement = context.scene.tachy.readMeasurementNonBlocking(0.1)
+            measurement = context.scene.tachy.readMeasurement(0.1)
             if measurement is None:
                 print("No measurement")
                 return {"RUNNING_MODAL"}
