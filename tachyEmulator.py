@@ -158,6 +158,6 @@ class Tachy:
         self.anyPoint(self.stPointNr, 1, 1, 1, angle, vert=vert, dist=dist)
         
     def computeStation(self):
-        for i in range(5):
+        for i in range(6):
             self.wait()
 
