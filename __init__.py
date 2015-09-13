@@ -1,20 +1,3 @@
-#Copyright (C) 2015 Felix Heeger
-#
-#This file is part of GOST: GeO Survey Tool.
-#
-#GOST is free software: you can redistribute it and/or modify
-#it under the terms of the GNU General Public License as published by
-#the Free Software Foundation, either version 3 of the License, or
-#(at your option) any later version.
-#
-#GOST is distributed in the hope that it will be useful,
-#but WITHOUT ANY WARRANTY; without even the implied warranty of
-#MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#GNU General Public License for more details.
-#
-#You should have received a copy of the GNU General Public License
-#along with GOST.  If not, see <http://www.gnu.org/licenses/>.
-
 bl_info = {
     "name": "GOST: GeO Survey Tool",
     "author": "Lukas Fischer, Felix Heeger",
@@ -87,7 +70,7 @@ class SelectPortOperator(bpy.types.Operator):
                 pass
             else:
                 ports.append(p)
-        names = ports + ["/dev/pts/18"]
+        names = ports + ["/dev/pts/5"]
         ids = ["p%i" % i for i in range(len(names))] 
         descriptions = names
         return list(zip(ids, names, descriptions))
@@ -114,109 +97,49 @@ class StationPoint1(bpy.types.Operator):
         return self.execute(context)
         
     def execute(self, context):
-        context.scene.tachy.setPosition(0.0, 0.0)
-        bpy.context.scene["stationPoint1"] = bpy.context.scene.objects.active.location
-        mes = context.scene.tachy.readMeasurement()
-        print(mes)
-        context.scene.tachy.setAngle(0.0)
-        bpy.context.scene["distStationPoint1"] = numpy.cos(gon2rad(mes["vertAngle"]) - numpy.pi/2)*mes["slopeDist"]
-        bpy.context.scene["vertAngleStationPoint1"] = gon2rad(mes["vertAngle"])
-        bpy.context.scene["reflectorHeightStationPoint1"] = mes["reflectorHeight"]
+        context.scene.tachy.stationPoint1(bpy.context.scene.objects.active.location)
         return {"FINISHED"}
 
-class StationPoint2(bpy.types.Operator):
-    bl_idname = "tachy.station_point2"
+class AddStationPoint(bpy.types.Operator):
+    bl_idname = "tachy.add_station_point"
     bl_label = "Tachy Panel"
     bl_options = {"UNDO"}
     
     @classmethod
     def poll(cls, context):
-        return bpy.types.Scene.tachy.connected
+        return bpy.types.Scene.tachy.connected \
+               and len(context.scene.tachy.stationPoint) > 0
     
     def invoke(self, context, event):
-        bpy.context.scene["stationPoint2"] = bpy.context.scene.objects.active.location
-        mes = context.scene.tachy.readMeasurement()
-        print(mes)
-        bpy.context.scene["distStationPoint2"] = numpy.cos(gon2rad(mes["vertAngle"]) - numpy.pi/2)*mes["slopeDist"]
-        bpy.context.scene["angleStationPoint2"] = mes["hzAngle"]
-        bpy.context.scene["vertAngleStationPoint2"] = gon2rad(mes["vertAngle"])
-        bpy.context.scene["reflectorHeightStationPoint2"] = mes["reflectorHeight"]
+        context.scene.tachy.stationPointN(bpy.context.scene.objects.active.location)
         return {"FINISHED"}
+
+
 
 class SetStation(bpy.types.Operator):
     bl_idname = "tachy.set_station"
-    bl_label = "Tachy Panel"
+    bl_label = "Set Station"
     bl_options = {"UNDO"}
     
     @classmethod
     def poll(cls, context):
-        return bpy.types.Scene.tachy.connected and "stationPoint1" in bpy.context.scene and "stationPoint2" in bpy.context.scene
-    
+        return bpy.types.Scene.tachy.connected \
+               and len(context.scene.tachy.stationPoint) > 2
+
+    #def getStationPoints(self, context):
+    #    pos, errors = bpy.types.Scene.tachy.computeStation()
+    #    retv = list(zip(["sPoint%i" % i for i in range(len(errors))], 
+    #                    ["(%f, %f, %f); error: %f" % (p[0],p[1],p[2],e) for p,e in zip(bpy.types.Scene.tachy.stationPoint[1:],errors)], 
+    #                    ["" % e for e in errors])
+    #                )
+    #    print(retv)
+    #    return retv
+
+    #sPointEnum = bpy.props.EnumProperty(items=getStationPoints, name="StaionPoints")
+
     def invoke(self, context, event):
-        sA = context.scene["distStationPoint1"]
-        sB = context.scene["distStationPoint2"]
-        gamma = gon2rad(context.scene["angleStationPoint2"])
-        print("Abstand zu A: %f, Abstand zu B: %f, Winkel zu B: %f(rad), %f(gon)\n" % (sA, sB, gamma, rad2gon(gamma)))
-
-        #xa = 0
-        #ya = sfsa
-        #xb = sfsb * numpy.sin(beta)
-        #yb = sfsb * numpy.cos(beta)
-
-        #print("Quellkoordinatensystem: a %f %f, b %f %f\n" % (xa,ya,xb,yb))
-
-        Ya, Xa, Za = context.scene["stationPoint1"]
-        Yb, Xb, Zb = context.scene["stationPoint2"]
-        print("Zeilkoordinatensystem: A %f %f, B %f %f\n" % (Xa,Ya,Xb,Yb))
-
-
-        #sab = dist(xa,ya,xb,yb)
-        SAB = dist(Xa, Ya, Xb, Yb) 
-        print("Abstand zwischen A und B:%f" % SAB)
-        #tab = numpy.arctan((xb - xa)/(yb - ya))
-        #print("Winkel im QKS: %f(rad), %f(gon)\n" % (tab, tab * 400/(2*numpy.pi)))
-        tAB = numpy.arctan((Yb - Ya)/(Xb - Xa)) % (2*numpy.pi)
-        print("Winkel im ZKS: %f(rad), %f(gon)\n" % (tAB, rad2gon(tAB)))
-        
-        #phi = Tab - tab
-        print("arccos((%f**2+%f**2-%f**2)/(2*%f*%f))" % (sA,SAB,sB,sA,SAB))
-        print("=arccos(%f)" % ((sA**2+SAB**2-sB**2)/(2*sA*SAB)))
-        alpha = numpy.arccos(min(1, (sA**2+SAB**2-sB**2)/(2*sA*SAB)))
-        print("Alpha: %f(rad), %f(gon)" % (alpha, rad2gon(alpha)))
-        tAS = tAB + alpha
-        print("Rotationswinkel: %f(rad), %f(gon)\n" % (tAS, rad2gon(tAS)))
-
-        #wenn der x wer des zweiten punkts kleiner ist als der des ersten muss man subtrahieren
-        if Xb < Xa:
-            XS = Xa - sA * numpy.cos(tAS)
-            YS = Ya - sA * numpy.sin(tAS)
-        else:
-            XS = Xa + sA * numpy.cos(tAS)
-            YS = Ya + sA * numpy.sin(tAS)
-        
-        Ga = numpy.sin(numpy.pi/2 - bpy.context.scene["vertAngleStationPoint1"]) * bpy.context.scene["distStationPoint1"]
-        Gb = numpy.sin(numpy.pi/2 - bpy.context.scene["vertAngleStationPoint2"]) * bpy.context.scene["distStationPoint2"]
-
-        print("Computed height difference: %f, %f" % (Ga, Gb))
-        
-        instrHeight = context.scene.tachy.getInstrumentHeight()
-        
-        ZS_list = [Za - Ga + bpy.context.scene["reflectorHeightStationPoint1"] - instrHeight,
-                   Zb - Gb + bpy.context.scene["reflectorHeightStationPoint2"] - instrHeight]
-        print("Comuted heights: %f, %f" % tuple(ZS_list))
-        ZS = numpy.mean(ZS_list)
-        
-        #set tachy position
-        context.scene.tachy.setPosition(YS, XS, ZS)
-        bpy.context.scene["tachyPosition"] = (YS, XS, ZS)
-        print("Position set to %f %f %f\n" % (YS, XS, ZS))
-        #set tachy angel
-        r = numpy.arcsin((Yb-YS)/sB) % (2*numpy.pi)
-        #a = context.scene.tachy.getAngle()
-        #print("Current Angle is %f\n" % a)
-        context.scene.tachy.setAngle(r*400/(2*numpy.pi))
-        print("Angle set to %f\n" % (r*400/(2*numpy.pi)))
-        print("Station set successful.\n")   
+        pos, angle = bpy.types.Scene.tachy.computeStation()
+        bpy.types.Scene.tachy.setStation(pos, angle)
         return {"FINISHED"}
 
 
@@ -230,8 +153,9 @@ class MeasurePoints(bpy.types.Operator):
     def poll(cls, context):
         if not bpy.types.Scene.tachy.connected:
             return False
-        if not "tachyPosition" in bpy.context.scene:
+        if not bpy.types.Scene.tachy.stationed:
             return False
+
         return True
     
     def invoke(self, context, event):
@@ -264,13 +188,14 @@ class MeasurePoints(bpy.types.Operator):
         try:
             measurement = context.scene.tachy.readMeasurement(0.1)
             if measurement is None:
-                #print("No measurement")
+                print("No measurement")
                 return {"RUNNING_MODAL"}
             else:
                 print(measurement)
                 x = measurement["targetEast"]
                 y = measurement["targetNorth"]
                 z = measurement["targetHeight"] 
+                
                 bpy.context.area.type='VIEW_3D'
                 if len(bpy.context.selected_objects) == 0:
                     self.report({"INFO"}, "Starting new mesh")
@@ -410,7 +335,7 @@ class MeasurePanel(bpy.types.Panel):
 
     def draw(self, context):
         layout = self.layout.column(align=True)
-        layout.operator("tachy.measure_points", text="Measure Poly Line")
+        layout.operator("tachy.measure_points", text="Measure Points")
         
 
 
@@ -426,13 +351,11 @@ class TachyPanel(bpy.types.Panel):
         layout.operator_menu_enum("tachy.select_port", property="ports", text="Connect Tachymeter")
         layout = self.layout.column(align=True)
         layout.operator("tachy.station_point1", text="Station Point 1")
-        layout.operator("tachy.station_point2", text="Station Point 2")
+        layout.operator("tachy.add_station_point", text="Add Station Point")
         layout = self.layout.column(align=True)
         layout.operator("tachy.set_station", text="Compute Station")
         layout = self.layout.column(align=True)
         layout.operator("tachy.measure_niv", text="Measure Nivellemnet")
-        layout = self.layout.column(align=True)        
-        layout.operator("tachy.measure_points", text="Measure Poly Line")
         
 
 
