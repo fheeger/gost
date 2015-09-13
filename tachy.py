@@ -276,7 +276,14 @@ class TachyConnection:
         s = numpy.sqrt((numpy.sum(W_X*W_X) + numpy.sum(W_X*W_Y)) / (2*n - 6))
         self.log.write("Precission: %f\n" % s)
         
-        return (Y0, X0), beta, s
+        #
+        if Y0 > Y[0]:
+            print("first station point lower than station")
+            angle = numpy.pi - beta
+        else:
+            angle = -beta
+        print("angle: %f" % angle)
+        return (X0, Y0), angle, s
         
     def computeHeight(self, a):
         g = numpy.sin(numpy.pi/2 - self.stationPointVAngle[a]) * self.stationPointDist[a]
@@ -292,12 +299,16 @@ class TachyConnection:
         (x, y), rotation, error = self.computeHorizontalPositionAndAngle()
         z = self.computeHeight(0)
         self.log.write("Position error: %f\n" % error)
+        self.log.write("Rotation: %f\n" % rotation)
         return (x, y, z), rotation#, error
         
     def setStation(self, p, a):
+        print("setting station")
         self.setPosition(p[0], p[1], p[2])
         currentAngle = self.getAngle()
-        self.setAngle((currentAngle - rad2gon(a)) % 400)
+        print("current angle: %f gon" % currentAngle)
+        print("rotation angle: %f gon" % rad2gon(a))
+        self.setAngle((currentAngle + rad2gon(a)) % 400)
         self.stationed = True
             
     
