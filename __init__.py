@@ -156,12 +156,18 @@ class MeasurePoints(bpy.types.Operator):
         if not bpy.types.Scene.tachy.stationed:
             return False
 
+#        num_selected_vert = 0
+#        for v in bmesh.from_edit_mesh(bpy.context.active_object.data).verts :
+#            if v.select:
+#                num_selected_vert += 1
+#        if num_selected_vert != 1:
+#            return False
         return True
     
     def invoke(self, context, event):
         print("start measurement")
         print(context.window_manager.modal_handler_add(self))
-        self._timer = context.window_manager.event_timer_add(1, context.window)
+        self._timer = context.window_manager.event_timer_add(3, context.window)
         
         return {'RUNNING_MODAL'}
     
@@ -195,10 +201,9 @@ class MeasurePoints(bpy.types.Operator):
                 x = measurement["targetEast"]
                 y = measurement["targetNorth"]
                 z = measurement["targetHeight"] 
-                
                 bpy.context.area.type='VIEW_3D'
                 if len(bpy.context.selected_objects) == 0:
-                    self.report({"INFO"}, "Starting new mesh")
+                    print("No object selected")
                     if bpy.context.mode != "OBJECT":
                         bpy.ops.object.mode_set(mode='OBJECT')
                     bpy.ops.mesh.primitive_plane_add(view_align=False, enter_editmode=False, location=(x, y, z))
@@ -209,6 +214,7 @@ class MeasurePoints(bpy.types.Operator):
                     mesh.data.vertices.add(1)
                     mesh.data.vertices[0].co = (0, 0, 0)
                 else:
+                    
                     bpy.ops.object.mode_set(mode='EDIT')
                     bpy.ops.mesh.extrude_region_move(MESH_OT_extrude_region={"mirror":False}, TRANSFORM_OT_translate={"value":(0, 0, 0), "constraint_axis":(False, False, False), "constraint_orientation":'GLOBAL', "mirror":False, "proportional":'DISABLED', "proportional_edit_falloff":'SMOOTH', "proportional_size":1, "snap":False, "snap_target":'CLOSEST', "snap_point":(0, 0, 0), "snap_align":False, "snap_normal":(0, 0, 0), "gpencil_strokes":False, "texture_space":False, "remove_on_cancel":False, "release_confirm":False})
                     bpy.context.scene.cursor_location = (x, y, z)
@@ -232,10 +238,14 @@ class MeasurePoints(bpy.types.Operator):
         b.verts[-1].select = True
         #add edge between them
         bpy.ops.mesh.edge_face_add()
-        #mark edeges for freestyle render
+        #mark edeges for freestyle render (select all edges first)
+        for e in b.edges:
+            e.select=True
         bpy.ops.mesh.mark_freestyle_edge(clear=False)
         #fill
         bpy.ops.mesh.fill()
+        #recalculate normals
+        bpy.ops.mesh.normals_make_consistent()
         bpy.ops.object.mode_set(mode='OBJECT')
         #make shading smooth
         bpy.ops.object.shade_smooth()
@@ -356,6 +366,7 @@ class TachyPanel(bpy.types.Panel):
         layout.operator("tachy.set_station", text="Compute Station")
         layout = self.layout.column(align=True)
         layout.operator("tachy.measure_niv", text="Measure Nivellemnet")
+        layout.operator("tachy.measure_points", text="Measure Points")
         
 
 
