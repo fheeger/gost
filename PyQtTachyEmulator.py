@@ -1,4 +1,5 @@
 import sys
+from glob import glob
 
 from PyQt5.QtCore import QObject, QTimer
 from PyQt5.QtWidgets import *
@@ -7,24 +8,35 @@ import serial
 
 class TachyConnection(QObject):
 
-    def __init__(self, dev, baut=4800, lineend="\r\n", log=sys.stderr):
+    def __init__(self, dev=None, baut=4800, lineend="\r\n", log=sys.stderr):
         super(TachyConnection, self).__init__()
         self.log = log
         self.lineend = lineend
-        self.port = serial.Serial(dev, baut)
+        if dev is None:
+            self.port = None
+        else:
+            self.port = serial.Serial(dev, baut)
         self.buffer = ""
         
- 
+    def connect(self, dev, baut=4800):
+        self.port = serial.Serial(dev, baut)
+        
     def readline(self):
+        if self.port is None:
+            raise NotConnectedError
         line = self.port.readline().decode("ascii")
         self.log.write("READ LINE: %s" % line)
         return line
         
     def write(self, data):
+        if self.port is None:
+            raise NotConnectedError
         self.log.write("WRITE: %s\n" % repr(data))
         self.port.write(bytes(data, "ascii"))
         
     def read(self, bytes=1, timeout=None):
+        if self.port is None:
+            raise NotConnectedError
         if not timeout is None:
             self.port.timeout = timeout
         data = self.port.read(bytes).decode("ascii")
@@ -32,6 +44,8 @@ class TachyConnection(QObject):
         return data
     
     def readIntoBuffer(self, bytes=100, timeout=0):
+        if self.port is None:
+            raise NotConnectedError
         if not timeout is None:
             self.port.timeout = timeout
         self.buffer += self.port.read(bytes).decode("ascii")
@@ -39,7 +53,6 @@ class TachyConnection(QObject):
             self.log.write("buffer: %s\n" % repr(self.buffer))
             tmp = self.buffer[:self.buffer.find(self.lineend)]
             self.buffer = self.buffer[self.buffer.find(self.lineend)+len(self.lineend):]
-            self.buffer = ""
             return tmp
         return None
             
@@ -106,6 +119,10 @@ class TachyEmulator(QWidget):
         
         self.ptNr = 0
         
+        self.selectPort = QComboBox(self)
+        for port in self.avail_ports():
+            self.selectPort.addItem(port)
+        
         #display current state
         self.xLabel = QLabel("")
         self.yLabel = QLabel("")
@@ -114,6 +131,7 @@ class TachyEmulator(QWidget):
         self.vertAngleLabel = QLabel("")
         self.instrumentHeightLabel = QLabel("")
         stateLayout = QGridLayout()
+        
         stateLayout.addWidget(QLabel("x:"), 0, 0)
         stateLayout.addWidget(self.xLabel, 0, 1)
         stateLayout.addWidget(QLabel("y:"), 1, 0)
@@ -128,7 +146,11 @@ class TachyEmulator(QWidget):
         stateLayout.addWidget(self.instrumentHeightLabel, 5, 1)
         
         self.meassureButton = QPushButton("Meassure Point")
+        self.meassureButton.setEnabled(False)
+
+
         mainLayout = QVBoxLayout()
+        mainLayout.addWidget(self.selectPort)
         mainLayout.addLayout(stateLayout)
         mainLayout.addWidget(self.meassureButton)
        
@@ -138,13 +160,14 @@ class TachyEmulator(QWidget):
         
         self.updateStateDisplay()
         
-        self.connection = TachyConnection(dev)
+        self.connection = TachyConnection()
         
         timer = QTimer(self)
         timer.timeout.connect(self.processData) 
         timer.start(100)
         
         self.meassureButton.clicked.connect(self.meassurePoint) 
+        self.selectPort.activated[str].connect(self.connect)
 
         
     def updateStateDisplay(self):
@@ -156,7 +179,10 @@ class TachyEmulator(QWidget):
         self.instrumentHeightLabel.setText(str(self.instrumentHeight))
  
     def processData(self):
-        data = self.connection.readIntoBuffer()
+        try:
+            data = self.connection.readIntoBuffer()
+        except NotConnectedError:
+            data = None
         if not data is None:
             comArr = data.strip().split("/")
             if comArr[0] == "GET":
@@ -203,7 +229,31 @@ class TachyEmulator(QWidget):
     def meassurePoint(self):
         meassureWindow = MeassureWindow(self)
         meassureWindow.exec_()
+        
+    def avail_ports(self):
+        if sys.platform[:3] == "win":
+            possible = ["COM%i" % i for i in range(1,255)]
+        else:
+            possible = glob("/dev/tty[a-zA-Z]*")
+        ports = []
+        for p in possible:
+            try:
+                serial.Serial(p).close()
+            except serial.SerialException:
+                pass
+            else:
+                ports.append(p)
+        #ports.append("/dev/pts/18")
+        return ports
+
+    def connect(self, port):
+        print("connecting to port: %s" % port)
+        self.connection.connect(port)
+        self.meassureButton.setEnabled(True)
             
+class NotConnectedError(IOError):
+    pass
+
 if __name__ == '__main__':
  
     app = QApplication(sys.argv)
