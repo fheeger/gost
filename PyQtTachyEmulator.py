@@ -219,7 +219,7 @@ class TachyEmulator(QWidget):
         data = "110006%+017.f 21.322%+017.f 22.322%+017.f 31..00%+017.f 81..00%+017.f 82..00%+017.f 83..00%+017.f 87..10%+017.f" % (self.ptNr, hz*10**5, vert*10**5, dist*10**3, x*10**3, y*10**3, z*10**3, reflectorH*10**3)
         self.connection.write("*%s\r\n" % data)
         self.connection.write("w\r\n")
-        answer = self.connection.readIntoBuffer(timeout=100)
+        answer = self.connection.readIntoBuffer(timeout=1)
         if answer.strip() != "OK":
             print("Kommunikation Fehlgeschlagen\n")
         else:

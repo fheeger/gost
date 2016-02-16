@@ -68,6 +68,8 @@ class TachyConnection:
         if self.port is None:
             raise TachyError("Not connected")
         data = self.port.readline().decode("ascii")
+        if len(data) == 0:
+            raise Timeout("Timeout during readline")
         self.log.write("READ LINE: %s\n" % data)
         return data
     
@@ -75,6 +77,8 @@ class TachyConnection:
         if self.port is None:
             raise TachyError("Not connected")
         data = self.port.read(size).decode("ascii")
+        if len(data) < size:
+            raise Timeout("Timeout during read")
         self.log.write("READ: %s\n" % data)
         return data
         
@@ -83,24 +87,20 @@ class TachyConnection:
             raise TachyError("Not connected")
         d = bytes(data, "ascii")
         self.log.write("WRITE: %s\n" % d)
-        self.port.write(d)
+        written = self.port.write(d)
+        if written < len(data):
+            raise Timeout("Timeout during write")
 
-    def readMeasurement(self, timeout=None):
+    def readMeasurement(self):
         if self.port is None:
             raise TachyError("Not connected")
-        if not timeout is None:
-            oldTimeout = self.port.timeout
-            self.port.timeout = timeout
+        if not self.port.timeout is None:
             star = self.read(1)
-            self.port.timeout = oldTimeout
-            if len(star) == 0:
-                #timeout occured
-                return None
             if star != "*":
                 raise TachyError("Unexpected character at start of measurement: '%s'" % star)
             mStr = self.readline().strip()
         else:
-            #if no 
+            #if no timeout
             mStr = self.readline()[1:].strip()
         data_point = {}
         lines = mStr.split(" ")
@@ -112,7 +112,7 @@ class TachyConnection:
                 data_point[self.codes[word_index]] = float(data)/10**self.digits[word_index]
             else:
                 data_point[self.codes[word_index]] = data
-        secondLine = self.readline().strip()
+        secondLine = self.readline().strip() 
         if secondLine != "w":
             raise TachyError("Unexpected character at end of measurement: '%s'" % secondLine)
         self.write("OK\r\n")
@@ -170,9 +170,13 @@ class TachyConnection:
             raise TachyError
             
     #free stationing
-    def stationPoint1(self, p):
+    def stationPoint1(self, p, timeout=60):
+        oldTimeout = self.port.timeout
+        self.port.timeout = timeout
+        self.port.write_timout = timeout
         self.setPosition(0.0, 0.0)
         self.stationPoint = [p]
+        
         mes = self.readMeasurement()
         self.setAngle(0.0)
         self.stationPointDist = [numpy.cos(gon2rad(mes["vertAngle"]) - numpy.pi/2)*mes["slopeDist"] ]
@@ -182,8 +186,13 @@ class TachyConnection:
             self.stationPointReflectorH = [ mes["reflectorHeight"] ]
         except KeyError:
             self.stationPointReflectorH = [self.getReflectorHeight()]
+        self.port.write_timout = oldTimeout
+        self.port.timeout = oldTimeout
         
-    def stationPointN(self, p):
+    def stationPointN(self, p, timeout=60):
+        oldTimeout = self.port.timeout
+        self.port.timeout = timeout
+        self.port.write_timout = timeout
         self.stationPoint.append(p)
         mes = self.readMeasurement()
         self.stationPointDist.append(numpy.cos(gon2rad(mes["vertAngle"]) - numpy.pi/2)*mes["slopeDist"])
@@ -193,6 +202,8 @@ class TachyConnection:
             self.stationPointReflectorH.append(mes["reflectorHeight"])
         except KeyError:
             self.stationPointReflectorH.append(self.getReflectorHeight())
+        self.port.write_timout = oldTimeout
+        self.port.timeout = oldTimeout
 
     def computeHorizontalPositionAndAngle(self):
         #number of points
@@ -295,14 +306,21 @@ class TachyConnection:
         return ZS
         
     
-    def computeStation(self):
+    def computeStation(self, timeout=60):
+        oldTimeout = self.port.timeout
+        self.port.timeout = timeout
+        self.port.write_timout = timeout
         (x, y), rotation, error = self.computeHorizontalPositionAndAngle()
         z = self.computeHeight(0)
         self.log.write("Position error: %f\n" % error)
         self.log.write("Rotation: %f\n" % rotation)
+        self.port.timeout = oldTimeout
         return (x, y, z), rotation#, error
         
-    def setStation(self, p, a):
+    def setStation(self, p, a, timeout=60):
+        oldTimeout = self.port.timeout
+        self.port.timeout = timeout
+        self.port.write_timout = timeout
         print("setting station")
         self.setPosition(p[0], p[1], p[2])
         currentAngle = self.getAngle()
@@ -310,7 +328,12 @@ class TachyConnection:
         print("rotation angle: %f gon" % rad2gon(a))
         self.setAngle((currentAngle + rad2gon(a)) % 400)
         self.stationed = True
+        self.port.write_timout = oldTimeout
+        self.port.timeout = oldTimeout
             
     
 class TachyError(IOError):
+    pass
+    
+class Timeout(IOError):
     pass
