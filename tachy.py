@@ -284,7 +284,7 @@ class TachyConnection:
             self.log.write("\tW_X[%i]: %f, W_Y[%i]: %f\n" % (i, W_X[i], i, W_Y[i]))
         
         #precission
-        s = numpy.sqrt((numpy.sum(W_X*W_X) + numpy.sum(W_X*W_Y)) / (2*n - 6))
+        s = numpy.sqrt(abs((numpy.sum(W_X*W_X) + numpy.sum(W_X*W_Y))) / (2*n - 6))
         self.log.write("Precission: %f\n" % s)
         
         #
