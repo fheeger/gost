@@ -27,20 +27,21 @@ def delta(x,y):
     
 def gon2rad(g):
     return g*np.pi/200
-    
+
+
 def rad2gon(r):
     return r*200/np.pi
 
 
-def grad2rad(g):
+def degr2rad(g):
     return g*np.pi/200
     
     
-def rad2grad(r):
+def rad2degr(r):
     return r*200/np.pi
 
 
-def Calc_Angle_from_Coords(a=[0,0,0], b=[0,0,0]):
+def calc_angle_from_coords(a=[0,0,0], b=[0,0,0]):
 
     #Koordinatenlisten in Variablen wandeln:
     xa=a[0]
@@ -58,41 +59,40 @@ def Calc_Angle_from_Coords(a=[0,0,0], b=[0,0,0]):
     #Gleichen sich Werte?
     if ya==yb:
         if xb>xa:
-            angle_grad=90
+            angle_degr=90
         else:
-            angle_grad=270
+            angle_degr=270
     elif xa==xb:
         if yb>ya:
-            angle_grad=0
+            angle_degr=0
         else:
-            angle_grad=180
+            angle_degr=180
     
     #Winkelfunktion erst in Radiant, dann in Grad:
     else:
         angle_rad = np.arctan(xval/yval)
-        angle_grad = rad2grad(angle_rad)
+        angle_degr = rad2degr(angle_rad)
 
     #In welchem Viertel befindet sich B von A ausgehen?
     if xa<xb and ya<yb:
-        angle_grad = angle_grad
+        angle_degr = angle_degr
     elif xa<xb and ya>yb:
-        angle_grad= angle_grad +180
+        angle_degr= angle_degr +180
     elif xa>xb and ya>yb:
-        angle_grad= angle_grad +180
+        angle_degr= angle_degr +180
     elif xa>xb and ya<yb:
-        angle_grad= angle_grad +360
+        angle_degr= angle_degr +360
         
-    print('Angle north to B:', angle_grad, ' Distance:', dist)
-    return(angle_grad, dist)
+    return(angle_degr, dist)
 
 
-def Append_Polar(dist=[0.0], angle_grad=[0.0], coord=[0,0,0]):
+def append_polar(dist=[0.0], angle_degr=[0.0], coord=[0,0,0]):
     
     #Koordinaten liste als variablen ausgeben:
     xcoord=coord[0]
     ycoord=coord[1]
     
-    angle_rad= grad2rad(angle_grad)
+    angle_rad= degr2rad(angle_degr)
     
     #Distanz orthogonal errechnen:
     distx = np.sin(angle_rad)*dist
@@ -102,5 +102,4 @@ def Append_Polar(dist=[0.0], angle_grad=[0.0], coord=[0,0,0]):
     xnew=xcoord+distx
     ynew=ycoord+disty
     
-    print(xnew, ynew)
     return(xnew, ynew)
