@@ -20,6 +20,7 @@ import sys
 
 import serial
 from PyQt5.QtWidgets import *
+from PyQt5.QtGui import *
 
 from .tachy import TachyConnection
 
@@ -27,13 +28,17 @@ class QtGostApp(QWidget):
     def __init__(self, parent=None):
         super(QtGostApp, self).__init__(parent)
         
-        self.connectButton = QPushButton("Connect Tachy")
+        self.connectButton = QPushButton("Mit Tachymeter verbinden")
+        self.stationButton = QPushButton("Freie Stationierung")
+        self.stationButton.setEnabled(False)
         
         mainLayout = QBoxLayout(2)
         mainLayout.addWidget(self.connectButton)
+        mainLayout.addWidget(self.stationButton)
         self.setLayout(mainLayout)
         
         self.connectButton.clicked.connect(self.openConnectWindow)
+        self.stationButton.clicked.connect(self.openStationWindow)
         
         self.connection = TachyConnection()
         
@@ -42,6 +47,16 @@ class QtGostApp(QWidget):
     def openConnectWindow(self):
         connectWindow = QtGostConnect(self)
         connectWindow.show()
+    
+    def openStationWindow(self):
+        stationWindow = QtGostStation(self)
+        stationWindow.show()
+    
+    def closeEvent(self, event):
+        if self.connection.connected:
+            print("closing tachy connection")
+            self.connection.close()
+        event.accept()
 
 class QtGostConnect(QDialog):
     posBautRates = [50, 75, 110, 134, 150, 200, 300, 600, 1200, 1800, 2400, 4800, 9600, 19200, 38400, 57600, 115200]
@@ -93,9 +108,50 @@ class QtGostConnect(QDialog):
         bautrate = int(self.selectBautRate.currentText())
         print("connecting to port: %s, with baut rate %i" % (port, bautrate))
         self.parentWidget().connection.open(port, bautrate)
+        self.parentWidget().connectButton.setEnabled(False)
+        self.parentWidget().stationButton.setEnabled(True)
         # self.meassureButton.setEnabled(True)
         super(QtGostConnect, self).accept()
+    
+class QtGostStation(QDialog):
+    def __init__(self, parent=None):
+        super(QtGostStation, self).__init__(parent)
         
+        self.pointList = QListView()
+        self.pointModel = QStandardItemModel(self.pointList)
+        self.xLab = QLabel("NA")
+        self.yLab = QLabel("NA")
+        self.zLab = QLabel("NA")
+        self.errorLab = QLabel("NA")
+        self.computeButton = QPushButton("Station Berechnen")
+        self.okButton = QPushButton("Ok")
+        self.cancleButton = QPushButton("Abbrechen")
+        
+        mainLayout = QBoxLayout(2)
+        mainLayout.addWidget(QLabel("Derzeitige Stationierung:"))
+        
+        stationLayout = QBoxLayout(0)
+        stationLayout.addWidget(QLabel("x:"))
+        stationLayout.addWidget(self.xLab)
+        stationLayout.addWidget(QLabel("y:"))
+        stationLayout.addWidget(self.yLab)
+        stationLayout.addWidget(QLabel("z:"))
+        stationLayout.addWidget(self.zLab)
+        stationLayout.addWidget(QLabel("std. Fehler:"))
+        stationLayout.addWidget(self.errorLab)
+        
+        mainLayout.addLayout(stationLayout)
+        mainLayout.addWidget(self.pointList)
+        
+        buttonBox = QDialogButtonBox()
+        buttonBox.addButton(self.okButton, QDialogButtonBox.AcceptRole)
+        buttonBox.addButton(self.cancleButton, QDialogButtonBox.RejectRole)
+        buttonBox.addButton(self.computeButton, QDialogButtonBox.ApplyRole)
+        
+        mainLayout.addWidget(buttonBox)
+        
+        self.setLayout(mainLayout)
+    
 # class QtNivel(QDialog):
     # def __init__(self, parent=None):
         # super(QtNivel, self).__init__(parent)
