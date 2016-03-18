@@ -303,7 +303,7 @@ class TachyConnection:
             angle = numpy.pi - beta
         else:
             angle = -beta
-        self.log.station("angle: %f\n" % angle)
+        self.log.write("angle: %f\n" % angle)
         return (X0, Y0), angle, s
         
     def computeHeight(self, a):
