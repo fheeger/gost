@@ -17,6 +17,7 @@
 
 
 import sys
+import bpy
 
 import serial
 from PyQt5.QtWidgets import *
@@ -30,33 +31,177 @@ class QtGostApp(QWidget):
         
         self.connectButton = QPushButton("Mit Tachymeter verbinden")
         self.stationButton = QPushButton("Freie Stationierung")
+        self.settingsButton = QPushButton("Standart Einstellungen")
         self.stationButton.setEnabled(False)
         
         mainLayout = QBoxLayout(2)
         mainLayout.addWidget(self.connectButton)
         mainLayout.addWidget(self.stationButton)
+        mainLayout.addWidget(self.settingsButton)
         self.setLayout(mainLayout)
         
         self.connectButton.clicked.connect(self.openConnectWindow)
         self.stationButton.clicked.connect(self.openStationWindow)
+        self.settingsButton.clicked.connect(self.openSettingsWindow)
+
         
         self.connection = TachyConnection()
         
         self.setWindowTitle("GeO Survey Tool - GOST")
         
     def openConnectWindow(self):
-        connectWindow = QtGostConnect(self)
-        connectWindow.show()
+        try:
+            connectWindow = QtGostConnect(self)
+            connectWindow.show()
+        except:
+            error=QErrorMessage(self)
+            error.showMessage('Can not connect to Tachy')
+
     
     def openStationWindow(self):
         stationWindow = QtGostStation(self)
         stationWindow.show()
+        
+    def openSettingsWindow(self):
+        settingsWindow = QtGostSettings(self)
+        settingsWindow.show()
     
     def closeEvent(self, event):
         if self.connection.connected:
             print("closing tachy connection")
             self.connection.close()
         event.accept()
+
+    
+class QtGostSettings(QDialog):
+    
+    def __init__(self, parent=None):
+        super(QtGostSettings, self).__init__(parent)
+        mainLayout = QGridLayout()
+        self.setLayout(mainLayout)
+
+        self.defaultButton = QPushButton("Standart wiederherstellen")
+        mainLayout.addWidget(self.defaultButton, 4, 2)
+        self.defaultButton.clicked.connect(self.standartSettings)
+
+
+        self.SetDpi = QSpinBox()
+        mainLayout.addWidget(self.SetDpi, 3, 1)
+
+        self.SetDpi.setRange(50, 1000)
+        try:
+            self.SetDpi.setValue(bpy.types.Scene.paperdpi)
+        except AttributeError:
+            self.SetDpi.setValue(150)
+            bpy.types.Scene.paperdpi = 150
+            
+            
+
+        self.selectUseKontur = QCheckBox(self)
+        mainLayout.addWidget(QLabel("Konturen render:"), 0, 0)
+        mainLayout.addWidget(self.selectUseKontur, 0, 1)
+
+
+        self.selectDinFormat = QComboBox(self)
+        mainLayout.addWidget(QLabel("DIN Format Rendern:"),1, 0)
+        mainLayout.addWidget(self.selectDinFormat, 1, 1)
+        self.selectDinFormat.addItems(['A4','A3','A2','A1','A0'])
+        self.selectDinFormat.currentIndexChanged.connect(self.computeRes)
+        self.SetDpi.valueChanged.connect(self.computeRes)
+        try:
+            if bpy.types.Scene.paperformat == 'A4':
+                self.selectDinFormat.setCurrentIndex(0)
+            elif bpy.types.Scene.paperformat == 'A3':
+                self.selectDinFormat.setCurrentIndex(1)
+            elif bpy.types.Scene.paperformat == 'A2':
+                self.selectDinFormat.setCurrentIndex(2)
+            elif bpy.types.Scene.paperformat == 'A1':
+                self.selectDinFormat.setCurrentIndex(3)
+            elif bpy.types.Scene.paperformat == 'A0':
+                self.selectDinFormat.setCurrentIndex(4)
+        except AttributeError:
+            bpy.types.Scene.paperformat = 'A4'
+            self.selectDinFormat.setCurrentIndex(0)
+
+
+        self.selectBackCol = QPushButton("Color")
+        mainLayout.addWidget(QLabel("Hintergrundfarbe:"), 2, 0)
+        mainLayout.addWidget(self.selectBackCol, 2,1)
+        self.selectBackCol.clicked.connect(self.pickColor)
+
+        self.okButton = QPushButton("Ok")
+        mainLayout.addWidget(self.okButton, 4, 0)
+        self.okButton.clicked.connect(self.accept)
+
+        self.cancleButton = QPushButton("Abbrechen")
+        mainLayout.addWidget(self.cancleButton, 4, 1)
+        self.cancleButton.clicked.connect(self.reject)
+
+
+        if bpy.data.scenes[0].render.use_freestyle:
+            self.selectUseKontur.setCheckState(2)
+
+
+    def pickColor(self):
+        backCol = QColorDialog(self).getColor()
+        red = backCol.red() /255
+        green = backCol.green() /255
+        blue = backCol.blue() /255
+        RgbCol = (red, green, blue)
+        bpy.data.scenes[0].world.horizon_color = RgbCol
+
+
+    def accept(self):
+        if self.selectUseKontur.isChecked():
+            bpy.data.scenes[0].render.use_freestyle = True
+        else:
+            bpy.data.scenes[0].render.use_freestyle = False
+        super(QtGostSettings, self).accept()
+
+
+    def standartSettings(self):
+        bpy.data.scenes[0].render.use_freestyle = True
+        self.selectUseKontur.setCheckState(2)
+        
+        bpy.types.Scene.paperformat = 'A4'
+        self.selectDinFormat.setCurrentIndex(0)
+
+        bpy.data.scenes[0].world.horizon_color = (1,1,1)
+
+        self.SetDpi.setDisplayIntegerBase(150)
+
+
+    def computeRes(self):
+        dpi = self.SetDpi.value()
+
+        bpy.types.Scene.paperdpi=dpi
+
+        paperformat = self.selectDinFormat.currentText()
+        bpy.types.Scene.paperformat=paperformat
+
+        
+        if paperformat == 'A4':
+            bpy.data.scenes[0].render.resolution_x = (29.7 / 2.5)*dpi
+            bpy.data.scenes[0].render.resolution_y = (21 / 2.5)*dpi
+            
+        elif paperformat == 'A3':
+            bpy.data.scenes[0].render.resolution_x = (42 / 2.5)*dpi
+            bpy.data.scenes[0].render.resolution_y = (29.7 / 2.5)*dpi
+            
+        elif paperformat == 'A2':
+            bpy.data.scenes[0].render.resolution_x = (59.4 / 2.5)*dpi
+            bpy.data.scenes[0].render.resolution_y = (42 / 2.5)*dpi
+            
+        elif paperformat == 'A1':
+            bpy.data.scenes[0].render.resolution_x = (84.1 / 2.5)*dpi
+            bpy.data.scenes[0].render.resolution_y = (59.4 / 2.5)*dpi
+            
+        elif paperformat == 'A0':
+            bpy.data.scenes[0].render.resolution_x = (118.9 / 2.5)*dpi
+            bpy.data.scenes[0].render.resolution_y = (84.1 / 2.5)*dpi
+
+
+
 
 class QtGostConnect(QDialog):
     posBautRates = [50, 75, 110, 134, 150, 200, 300, 600, 1200, 1800, 2400, 4800, 9600, 19200, 38400, 57600, 115200]
