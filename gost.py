@@ -81,13 +81,12 @@ class QtGostSettings(QDialog):
         self.setLayout(mainLayout)
 
         self.defaultButton = QPushButton("Standart wiederherstellen")
-        mainLayout.addWidget(self.defaultButton, 4, 2)
+        mainLayout.addWidget(self.defaultButton, 4, 0)
         self.defaultButton.clicked.connect(self.standartSettings)
 
 
         self.SetDpi = QSpinBox()
         mainLayout.addWidget(self.SetDpi, 3, 1)
-
         self.SetDpi.setRange(50, 1000)
         try:
             self.SetDpi.setValue(bpy.types.Scene.paperdpi)
@@ -98,7 +97,7 @@ class QtGostSettings(QDialog):
             
 
         self.selectUseKontur = QCheckBox(self)
-        mainLayout.addWidget(QLabel("Konturen render:"), 0, 0)
+        mainLayout.addWidget(QLabel("Konturen rendern:"), 0, 0)
         mainLayout.addWidget(self.selectUseKontur, 0, 1)
 
 
@@ -130,8 +129,9 @@ class QtGostSettings(QDialog):
         self.selectBackCol.clicked.connect(self.pickColor)
 
         self.okButton = QPushButton("Ok")
-        mainLayout.addWidget(self.okButton, 4, 0)
+        mainLayout.addWidget(self.okButton, 4, 2)
         self.okButton.clicked.connect(self.accept)
+        self.okButton.setDefault(True)
 
         self.cancleButton = QPushButton("Abbrechen")
         mainLayout.addWidget(self.cancleButton, 4, 1)
