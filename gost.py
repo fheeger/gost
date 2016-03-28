@@ -24,6 +24,7 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
 
 from .tachy import TachyConnection
+from .util import getSelectedObject
 
 class QtGostApp(QWidget):
     def __init__(self, parent=None):
