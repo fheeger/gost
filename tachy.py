@@ -94,15 +94,16 @@ class TachyConnection:
     def readMeasurement(self):
         if self.port is None:
             raise TachyError("Not connected")
-        if not self.port.timeout is None:
-            star = self.read(1)
-            if star != "*":
-                raise TachyError("Unexpected character at start of measurement: '%s'" % star)
-            mStr = self.readline().strip()
-        else:
-            #if no timeout
-            mStr = self.readline()[1:].strip()
+            
+        rawStr = self.readline().strip()
+        mStr = rawStr[1:]
+        if rawStr[0] != "*":
+            raise TachyError("Unexpected character at start of measurement: '%s'" % star)
+
+            
         data_point = {}
+        if not mStr:
+            return None
         lines = mStr.split(" ")
         for line in lines:
             word_index = line[0:2]
@@ -170,14 +171,16 @@ class TachyConnection:
             raise TachyError
             
     #free stationing
-    def stationPoint1(self, p, timeout=60):
-        oldTimeout = self.port.timeout
-        self.port.timeout = timeout
-        self.port.write_timout = timeout
+    def stationPoint1(self, p, measurement=None, timeout=60):
         self.setPosition(0.0, 0.0)
         self.stationPoint = [p]
-        
-        mes = self.readMeasurement()
+        if measurement is None:
+            oldTimeout = self.port.timeout
+            self.port.timeout = timeout
+            self.port.write_timout = timeout
+            mes = self.readMeasurement()
+        else:
+            mes = measurement
         self.setAngle(0.0)
         self.stationPointDist = [numpy.cos(gon2rad(mes["vertAngle"]) - numpy.pi/2)*mes["slopeDist"] ]
         self.stationPointHAngle = [0.0]
@@ -186,15 +189,19 @@ class TachyConnection:
             self.stationPointReflectorH = [ mes["reflectorHeight"] ]
         except KeyError:
             self.stationPointReflectorH = [self.getReflectorHeight()]
-        self.port.write_timout = oldTimeout
-        self.port.timeout = oldTimeout
+        if measurement is None:
+            self.port.write_timout = oldTimeout
+            self.port.timeout = oldTimeout
         
-    def stationPointN(self, p, timeout=60):
-        oldTimeout = self.port.timeout
-        self.port.timeout = timeout
-        self.port.write_timout = timeout
+    def stationPointN(self, p, measurement=None, timeout=60):
         self.stationPoint.append(p)
-        mes = self.readMeasurement()
+        if measurement is None:
+            oldTimeout = self.port.timeout
+            self.port.timeout = timeout
+            self.port.write_timout = timeout
+            mes = self.readMeasurement()
+        else:
+            mes = measurement
         self.stationPointDist.append(numpy.cos(gon2rad(mes["vertAngle"]) - numpy.pi/2)*mes["slopeDist"])
         self.stationPointHAngle.append(gon2rad(mes["hzAngle"]))
         self.stationPointVAngle.append(gon2rad(mes["vertAngle"]))
@@ -202,8 +209,9 @@ class TachyConnection:
             self.stationPointReflectorH.append(mes["reflectorHeight"])
         except KeyError:
             self.stationPointReflectorH.append(self.getReflectorHeight())
-        self.port.write_timout = oldTimeout
-        self.port.timeout = oldTimeout
+        if measurement is None:
+            self.port.write_timout = oldTimeout
+            self.port.timeout = oldTimeout
 
     def computeHorizontalPositionAndAngle(self):
         #number of points
@@ -315,7 +323,7 @@ class TachyConnection:
         self.log.write("Position error: %f\n" % error)
         self.log.write("Rotation: %f\n" % rotation)
         self.port.timeout = oldTimeout
-        return (x, y, z), rotation#, error
+        return (x, y, z), rotation, error
         
     def setStation(self, p, a, timeout=60):
         oldTimeout = self.port.timeout
@@ -323,10 +331,7 @@ class TachyConnection:
         self.port.write_timout = timeout
         print("setting station")
         self.setPosition(p[0], p[1], p[2])
-        currentAngle = self.getAngle()
-        print("current angle: %f gon" % currentAngle)
-        print("rotation angle: %f gon" % rad2gon(a))
-        self.setAngle((currentAngle + rad2gon(a)) % 400)
+        self.setAngle(a)
         self.stationed = True
         self.port.write_timout = oldTimeout
         self.port.timeout = oldTimeout
