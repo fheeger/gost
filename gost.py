@@ -18,12 +18,14 @@
 
 import sys
 import bpy
+from mathutils import Vector
 
 import serial
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
+from PyQt5.QtCore import QTimer, Qt
 
-from .tachy import TachyConnection
+from .tachy import TachyConnection, Timeout
 from .util import getSelectedObject
 
 class QtGostApp(QWidget):
@@ -32,19 +34,25 @@ class QtGostApp(QWidget):
         
         self.connectButton = QPushButton("Mit Tachymeter verbinden")
         self.stationButton = QPushButton("Freie Stationierung")
+        self.setStationButton = QPushButton("Stationierung auf Punkt")
+        self.measurePolyButton = QPushButton("Poly-Linie messen")
         self.settingsButton = QPushButton("Standart Einstellungen")
         self.stationButton.setEnabled(False)
         
         mainLayout = QBoxLayout(2)
         mainLayout.addWidget(self.connectButton)
         mainLayout.addWidget(self.stationButton)
+        mainLayout.addWidget(self.setStationButton)
+        mainLayout.addWidget(self.measurePolyButton)
         mainLayout.addWidget(self.settingsButton)
         self.setLayout(mainLayout)
         
         self.connectButton.clicked.connect(self.openConnectWindow)
         self.stationButton.clicked.connect(self.openStationWindow)
         self.settingsButton.clicked.connect(self.openSettingsWindow)
-
+        self.setStationButton.clicked.connect(self.openSetStationWindow)
+        self.measurePolyButton.clicked.connect(self.measurePoly)
+        
         
         self.connection = TachyConnection()
         
@@ -63,6 +71,10 @@ class QtGostApp(QWidget):
         stationWindow = QtGostStation(self)
         stationWindow.show()
         
+    def openSetStationWindow(self):
+        setStationWindow = QtSetStation(self)
+        setStationWindow.show()
+        
     def openSettingsWindow(self):
         settingsWindow = QtGostSettings(self)
         settingsWindow.show()
@@ -72,6 +84,20 @@ class QtGostApp(QWidget):
             print("closing tachy connection")
             self.connection.close()
         event.accept()
+        
+    def measurePoly(self):
+        self.mes = QtWaitForPolyLine(self)
+        self.mes.setWindowModality(Qt.ApplicationModal)
+        self.mes.finished.connect(self.stopMeasurePoly)
+        self.mes.show()
+        
+    def stopMeasurePoly(self):
+        self.mes.timer.stop()
+        self.connection.port.timeout=None
+        self.mes.deleteLater()
+        self.mes = None
+        
+        
 
     
 class QtGostSettings(QDialog):
@@ -266,7 +292,6 @@ class QtGostStation(QDialog):
         self.pointList = QTableWidget(self)
         self.pointList.setColumnCount(7)
         self.pointList.setHorizontalHeaderLabels(["Name","X","Y","Z","Abweichung","",""])
-        #self.pointModel = QStandardItemModel(self.pointList)
         self.xLab = QLabel("NA")
         self.yLab = QLabel("NA")
         self.zLab = QLabel("NA")
@@ -305,7 +330,7 @@ class QtGostStation(QDialog):
         self.okButton.clicked.connect(self.accept)
         self.cancleButton.clicked.connect(self.reject)
         self.addPointButton.clicked.connect(self.startAddPoint)
-        #self.meassureButtons = []
+        self.computeButton.clicked.connect(self.computeStation)
 
         self.pointData = []
 
@@ -343,7 +368,7 @@ class QtGostStation(QDialog):
         for i in range(self.pointList.rowCount()):
             if self.pointList.cellWidget(i, 5) == self.sender():
                 self.pointList.removeRow(i)
-                self.pointData[i] = None
+                self.pointData = self.pointData[:i] + self.pointData[i+1:]
                 break
                 
     def startMeasurePoint(self):
@@ -361,6 +386,79 @@ class QtGostStation(QDialog):
         self.measure.deleteLater()
         self.measure = None
         self.show()
+    
+    def computeStation(self):
+        gostApp = self.parentWidget()
+        p1 = (float(self.pointList.item(0,1).text()),
+              float(self.pointList.item(0,2).text()),
+              float(self.pointList.item(0,3).text()))
+        gostApp.connection.stationPoint1(p1, self.pointData[0])
+        for i in range(1, self.pointList.rowCount()):
+            p = (float(self.pointList.item(i,1).text()),
+                 float(self.pointList.item(i,2).text()),
+                 float(self.pointList.item(i,3).text()))
+            gostApp.connection.stationPointN(p, self.pointData[i])
+        pos, angle, error = gostApp.connection.computeStation()
+        self.xLab.setText(str(pos[0]))
+        self.yLab.setText(str(pos[1]))
+        self.zLab.setText(str(pos[2]))
+        self.errorLabsetText(str(error))
+        self.rotAngle = angle
+        
+    def accept(self):
+        gostApp = self.parentWidget()
+        pos = (self.xLab.text(), self.yLab.text(), self.zLab.text())
+        a = self.rotAngle
+        currentAngle = gostApp.connect.getAngle()
+        print("current angle: %f gon" % currentAngle)
+        print("rotation angle: %f gon" % rad2gon(a))
+        angle = (currentAngle + rad2gon(a)) % 400
+        gostApp.connection.setStation(pos, angle)
+        
+class QtWaitForPolyLine(QMessageBox):
+    def __init__(self, parent=None):
+        super(QtWaitForPolyLine, self).__init__(QMessageBox.Question, "Warte auf Messungen",
+                                                 "Bitte Punkte mit dem Tachymeter messen",
+                                                 buttons=QMessageBox.Cancel,
+                                                 parent=parent)
+        self.move(0,0)
+        self.timer = QTimer(self)
+        self.timer.setInterval(500)
+        self.parentWidget().connection.port.timeout=0.1
+        self.timer.timeout.connect(self.pollMeasurement)
+        self.timer.start()
+        
+    def pollMeasurement(self):
+        try:
+            measurement = self.parentWidget().connection.readMeasurement()
+        except Timeout:
+            pass
+        else:
+            print("measure")
+            x = measurement["targetEast"]
+            y = measurement["targetNorth"]
+            z = measurement["targetHeight"] 
+            #bpy.context.area.type='VIEW_3D'
+            if getSelectedObject() is None:
+                print("No object selected")
+                mesh = bpy.data.meshes.new(name="New Mesh")
+                mesh.from_pydata([Vector((0,0,0))], [], [])
+                obj = bpy.data.objects.new("New Object", mesh)
+                obj.location = (x,y,z)
+                bpy.data.scenes[0].objects.link(obj)
+                obj.select=True
+            else:  
+                obj = getSelectedObject()
+                obj.data.vertices.add(1)
+                ol = obj.location
+                obj.data.vertices[-1].co = (x-ol[0], y-ol[1], z-ol[2])
+                obj.data.edges.add(1)
+                obj.data.edges[-1].vertices = [len(obj.data.vertices)-1, len(obj.data.vertices)-2]
+            bpy.data.scenes[0].update()
+            # self.timer.stop()
+            # self.accept()
+                
+
         
 class QtWaitForSelection(QMessageBox):
     def __init__(self, nowSelected, parent=None):
@@ -400,8 +498,41 @@ class QtWaitForMeasurement(QMessageBox):
         self.data = self.parentWidget().parentWidget().connection.readMeasurement()
         self.timer.stop()
         self.accept()
+ 
+class QtSetStation(QDialog):
+    def __init__(self, parent=None):
+        super(QtSetStation, self).__init__(parent)
+        self.okButton = QPushButton("Ok")
+        self.cancleButton = QPushButton("Abbrechen")
+        self.xField = QLineEdit()
+        self.yField = QLineEdit()
+        self.zField = QLineEdit()
+        self.angleField = QLineEdit()
+                
+        mainLayout = QGridLayout()
+        mainLayout.addWidget(QLabel("X:"), 0, 0)
+        mainLayout.addWidget(self.xField, 0, 1)
+        mainLayout.addWidget(QLabel("Y:"),1, 0)
+        mainLayout.addWidget(self.yField, 1, 1)
+        mainLayout.addWidget(QLabel("Z:"),2, 0)
+        mainLayout.addWidget(self.zField, 2, 1)
+        mainLayout.addWidget(QLabel("Winkel:"),3, 0)
+        mainLayout.addWidget(self.angleField, 3, 1)
+        mainLayout.addWidget(self.okButton, 4, 0)
+        mainLayout.addWidget(self.cancleButton, 4, 1)
         self.setLayout(mainLayout)
-    
+        
+        self.okButton.clicked.connect(self.accept) 
+        self.cancleButton.clicked.connect(self.reject)
+        
+    def accept(self):
+        p = (float(self.xField.text()),
+             float(self.yField.text()),
+             float(self.zField.text()))
+        a = float(self.angleField.text())
+        self.parentWidget().connection.setStation(p, a)
+        super(QtSetStation, self).accept()
+ 
 # class QtNivel(QDialog):
     # def __init__(self, parent=None):
         # super(QtNivel, self).__init__(parent)
