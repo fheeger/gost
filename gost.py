@@ -262,8 +262,10 @@ class QtGostStation(QDialog):
     def __init__(self, parent=None):
         super(QtGostStation, self).__init__(parent)
         
-        self.pointList = QListView()
-        self.pointModel = QStandardItemModel(self.pointList)
+        self.pointList = QTableWidget(self)
+        self.pointList.setColumnCount(7)
+        self.pointList.setHorizontalHeaderLabels(["Name","X","Y","Z","Abweichung","",""])
+        #self.pointModel = QStandardItemModel(self.pointList)
         self.xLab = QLabel("NA")
         self.yLab = QLabel("NA")
         self.zLab = QLabel("NA")
@@ -271,6 +273,7 @@ class QtGostStation(QDialog):
         self.computeButton = QPushButton("Station Berechnen")
         self.okButton = QPushButton("Ok")
         self.cancleButton = QPushButton("Abbrechen")
+        self.addPointButton = QPushButton("Punkt Hinzufügen")
         
         mainLayout = QBoxLayout(2)
         mainLayout.addWidget(QLabel("Derzeitige Stationierung:"))
@@ -287,6 +290,7 @@ class QtGostStation(QDialog):
         
         mainLayout.addLayout(stationLayout)
         mainLayout.addWidget(self.pointList)
+        mainLayout.addWidget(self.addPointButton)
         
         buttonBox = QDialogButtonBox()
         buttonBox.addButton(self.okButton, QDialogButtonBox.AcceptRole)
@@ -295,6 +299,106 @@ class QtGostStation(QDialog):
         
         mainLayout.addWidget(buttonBox)
         
+        self.setLayout(mainLayout)
+
+        self.okButton.clicked.connect(self.accept)
+        self.cancleButton.clicked.connect(self.reject)
+        self.addPointButton.clicked.connect(self.startAddPoint)
+        #self.meassureButtons = []
+
+        self.pointData = []
+
+    def startAddPoint(self):
+        for obj in bpy.data.objects:
+            obj.select = False
+        nowSelected =  getSelectedObject()
+        self.wait = QtWaitForSelection(nowSelected, self)
+        self.wait.setWindowModality(Qt.ApplicationModal)
+        self.wait.show()
+        self.hide()
+        self.wait.finished.connect(self.addPoint)
+
+    def addPoint(self, result):
+        if result == QDialog.Accepted:
+            self.pointList.setRowCount(self.pointList.rowCount() + 1)
+            name = getSelectedObject().name
+            x,y,z = getSelectedObject().location
+            self.pointList.setItem(self.pointList.rowCount()-1, 0, QTableWidgetItem(name))
+            self.pointList.setItem(self.pointList.rowCount()-1, 1, QTableWidgetItem(str(x)))
+            self.pointList.setItem(self.pointList.rowCount()-1, 2, QTableWidgetItem(str(y)))
+            self.pointList.setItem(self.pointList.rowCount()-1, 3, QTableWidgetItem(str(z)))
+            remButton = QPushButton("Punkt löschen")
+            remButton.clicked.connect(self.removePoint)
+            self.pointList.setCellWidget(self.pointList.rowCount()-1, 5, remButton)
+            measButton = QPushButton("Punkt messen")
+            measButton.clicked.connect(self.startMeasurePoint)
+            self.pointList.setCellWidget(self.pointList.rowCount()-1, 6, measButton)
+            self.pointData.append(None)
+        self.wait.deleteLater()
+        self.wait = None
+        self.show()
+
+    def removePoint(self):
+        for i in range(self.pointList.rowCount()):
+            if self.pointList.cellWidget(i, 5) == self.sender():
+                self.pointList.removeRow(i)
+                self.pointData[i] = None
+                break
+                
+    def startMeasurePoint(self):
+        for index in range(self.pointList.rowCount()):
+            if self.pointList.cellWidget(index, 6) == self.sender():
+                break
+        self.measure = QtWaitForMeasurement(index, self)
+        self.measure.setWindowModality(Qt.ApplicationModal)
+        self.measure.show()
+        self.hide()
+        self.measure.finished.connect(self.measurePoint)
+        
+    def measurePoint(self):
+        self.pointData[self.measure.index] = self.measure.data
+        self.measure.deleteLater()
+        self.measure = None
+        self.show()
+        
+class QtWaitForSelection(QMessageBox):
+    def __init__(self, nowSelected, parent=None):
+        super(QtWaitForSelection, self).__init__(QMessageBox.Question, "Warte auf Auswahl",
+                                                 "Bitte wählen sie ein Object im 3d view  aus",
+                                                 buttons=QMessageBox.Cancel,
+                                                 parent=parent)
+        self.move(0,0)
+        self.timer = QTimer(self)
+        self.timer.setInterval(50)
+        self.timer.timeout.connect(self.pollSelection)
+        self.timer.start()
+        self.oldSelected = nowSelected
+        self.newSelected = None
+
+    def pollSelection(self):
+        nowSelected = getSelectedObject()
+        if not nowSelected == self. oldSelected:
+            self.newSelected = nowSelected
+            self.timer.stop()
+            self.accept()
+
+class QtWaitForMeasurement(QMessageBox):
+    def __init__(self, index, parent=None):
+        super(QtWaitForMeasurement, self).__init__(QMessageBox.Question, "Warte auf Messung",
+                                                   "Bitte führen sie eine Messung mit dem Tachymeter durch",
+                                                   buttons=QMessageBox.Cancel,
+                                                   parent=parent)
+        self.move(0,0)
+        self.timer = QTimer(self)
+        self.timer.setInterval(50)
+        self.index = index
+        self.timer.timeout.connect(self.pollTachy)
+        self.timer.start()
+
+    def pollTachy(self):
+        self.data = self.parentWidget().parentWidget().connection.readMeasurement()
+        self.timer.stop()
+        self.accept()
         self.setLayout(mainLayout)
     
 # class QtNivel(QDialog):
