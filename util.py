@@ -28,3 +28,9 @@ def gon2rad(g):
     
 def rad2gon(r):
     return r*200/numpy.pi
+
+def getSelectedObject():
+    for obj in bpy.data.objects:
+        if obj.select:
+            return obj
+    return None
