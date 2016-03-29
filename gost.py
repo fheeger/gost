@@ -37,6 +37,7 @@ class QtGostApp(QWidget):
         self.setStationButton = QPushButton("Stationierung auf Punkt")
         self.measurePolyButton = QPushButton("Poly-Linie messen")
         self.settingsButton = QPushButton("Standart Einstellungen")
+        self.layoutButton = QPushButton("Neues Ansichtsfenster")
         self.stationButton.setEnabled(False)
         
         mainLayout = QBoxLayout(2)
@@ -45,6 +46,7 @@ class QtGostApp(QWidget):
         mainLayout.addWidget(self.setStationButton)
         mainLayout.addWidget(self.measurePolyButton)
         mainLayout.addWidget(self.settingsButton)
+        mainLayout.addWidget(self.layoutButton)
         self.setLayout(mainLayout)
         
         self.connectButton.clicked.connect(self.openConnectWindow)
@@ -52,12 +54,81 @@ class QtGostApp(QWidget):
         self.settingsButton.clicked.connect(self.openSettingsWindow)
         self.setStationButton.clicked.connect(self.openSetStationWindow)
         self.measurePolyButton.clicked.connect(self.measurePoly)
-        
+        self.layoutButton.clicked.connect(self.newLayout)
         
         self.connection = TachyConnection()
         
         self.setWindowTitle("GeO Survey Tool - GOST")
+    
+    #kleinsten und größten Wert herausfinden!
+    
+    def newLayout(self):
+    
+       # 'Drücken Sie B um die darzustellenden Objekte zu selektieren'
+       
+        xmin = float("inf")
+        ymin = float("inf")
+        zmin = float("inf")
         
+        xmax = 0
+        ymax = 0
+        zmax = 0
+        
+        for sel in bpy.data.objects:
+            if sel.select:
+                x = sel.location[0]
+                if x > xmax:
+                    xmax=x
+                if xmin > x:
+                    xmin=x
+        
+                y = sel.location[1]
+                if y > ymax:
+                    ymax=y
+                if ymin > y:
+                    ymin=y
+                 
+                z = sel.location[2]
+                if z > zmax:
+                    zmax=z
+                if zmin > z:
+                    zmin=z
+                    
+        print(xmin, xmax, ymin, ymax, zmin, zmax)
+        
+        rangex= xmax - xmin
+        
+        LayposX = xmin + ((xmax - xmin) /2)
+        LayposY = ymin + ((ymax - ymin) /2)
+        LayposZ = zmax + 20
+        
+        bpy.ops.object.camera_add(view_align=True, enter_editmode=False, location=(LayposX, LayposY, LayposZ))
+        name = 'Ansichtsfenster'
+        
+        for sel in bpy.data.objects:
+            if sel.select:
+                sel.data.name = name
+                sel.name = name
+        
+        bpy.data.cameras[name].type = 'ORTHO'
+        
+        
+        
+        if bpy.types.Scene.paperformat == 'A4':
+            Paperwidth = 29.7
+        elif bpy.types.Scene.paperformat == 'A3':
+            Paperwidth = 42
+        elif bpy.types.Scene.paperformat == 'A2':
+            Paperwidth = 59.4
+        elif bpy.types.Scene.paperformat == 'A1':
+            Paperwidth = 84.1
+        elif bpy.types.Scene.paperformat == 'A0':
+            Paperwidth = 118.9
+            
+        bpy.data.cameras[name].ortho_scale = Paperwidth
+
+
+    
     def openConnectWindow(self):
         try:
             connectWindow = QtGostConnect(self)
