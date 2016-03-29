@@ -14,7 +14,7 @@
 #
 #You should have received a copy of the GNU General Public License
 #along with GOST.  If not, see <http://www.gnu.org/licenses/>.
-
+import bpy
 import numpy
 
 def dist(p1, p2):
