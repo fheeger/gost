@@ -60,6 +60,9 @@ class QtGostApp(QWidget):
         self.connection = TachyConnection()
         
         self.setWindowTitle("GeO Survey Tool - GOST")
+        self.setWindowIcon(QIcon('gost.png'))  
+        self.setGeometry(10, 30, 300, 600)
+    
     
     #kleinsten und größten Wert herausfinden!
     
