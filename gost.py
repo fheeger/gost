@@ -27,7 +27,7 @@ from PyQt5.QtGui import *
 from PyQt5.QtCore import QTimer, Qt
 
 from .tachy import TachyConnection, Timeout
-from .util import getSelectedObject, getContext
+from .util import getSelectedObject, getContext, rad2gon
 
 class QtGostApp(QWidget):
     def __init__(self, parent=None):
@@ -403,11 +403,13 @@ class QtGostStation(QDialog):
         self.setLayout(mainLayout)
 
         self.okButton.clicked.connect(self.accept)
+        self.okButton.setEnabled(False)
         self.cancleButton.clicked.connect(self.reject)
         self.addPointButton.clicked.connect(self.startAddPoint)
         self.computeButton.clicked.connect(self.computeStation)
 
         self.pointData = []
+        self.setGeometry(10, 30, 800, 600)
 
     def startAddPoint(self):
         for obj in bpy.data.objects:
@@ -458,11 +460,17 @@ class QtGostStation(QDialog):
         
     def measurePoint(self):
         self.pointData[self.measure.index] = self.measure.data
+        self.pointList.item(self.measure.index, 0).setBackground(QColor(0,200,0))
         self.measure.deleteLater()
         self.measure = None
         self.show()
     
     def computeStation(self):
+        print(len(self.pointData))
+        if sum([not x is None for x in self.pointData]) < 3:
+            QMessageBox.critical(self, "Nicht Genug Punkte", "Es sind nicht genug Punkte für die Stationierung eingemessen.")
+            return
+        
         gostApp = self.parentWidget()
         p1 = (float(self.pointList.item(0,1).text()),
               float(self.pointList.item(0,2).text()),
@@ -477,18 +485,20 @@ class QtGostStation(QDialog):
         self.xLab.setText(str(pos[0]))
         self.yLab.setText(str(pos[1]))
         self.zLab.setText(str(pos[2]))
-        self.errorLabsetText(str(error))
+        self.errorLab.setText(str(error))
         self.rotAngle = angle
+        self.okButton.setEnabled(True)
         
     def accept(self):
         gostApp = self.parentWidget()
-        pos = (self.xLab.text(), self.yLab.text(), self.zLab.text())
+        pos = (float(self.xLab.text()), float(self.yLab.text()), float(self.zLab.text()))
         a = self.rotAngle
-        currentAngle = gostApp.connect.getAngle()
+        currentAngle = gostApp.connection.getAngle()
         print("current angle: %f gon" % currentAngle)
         print("rotation angle: %f gon" % rad2gon(a))
         angle = (currentAngle + rad2gon(a)) % 400
         gostApp.connection.setStation(pos, angle)
+        super(QtGostStation, self).accept()
         
 class QtWaitForPolyLine(QDialog):
     def __init__(self, parent=None):
