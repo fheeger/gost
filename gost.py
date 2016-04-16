@@ -18,6 +18,7 @@
 
 import sys
 import bpy
+import bmesh
 from mathutils import Vector
 
 import serial
@@ -26,7 +27,7 @@ from PyQt5.QtGui import *
 from PyQt5.QtCore import QTimer, Qt
 
 from .tachy import TachyConnection, Timeout
-from .util import getSelectedObject
+from .util import getSelectedObject, getContext
 
 class QtGostApp(QWidget):
     def __init__(self, parent=None):
@@ -486,12 +487,31 @@ class QtGostStation(QDialog):
         angle = (currentAngle + rad2gon(a)) % 400
         gostApp.connection.setStation(pos, angle)
         
-class QtWaitForPolyLine(QMessageBox):
+class QtWaitForPolyLine(QDialog):
     def __init__(self, parent=None):
-        super(QtWaitForPolyLine, self).__init__(QMessageBox.Question, "Warte auf Messungen",
-                                                 "Bitte Punkte mit dem Tachymeter messen",
-                                                 buttons=QMessageBox.Cancel,
-                                                 parent=parent)
+        super(QtWaitForPolyLine, self).__init__(parent=parent)
+        
+        self.setWindowTitle("Warte auf Messungen")
+        
+        mainLayout = QVBoxLayout(self)
+        mainLayout.addWidget(QLabel("Bitte Punkte mit dem Tachymeter messen!"))
+        
+        self.closeButton = QPushButton("Linie schließen")
+        self.closeButton.clicked.connect(self.closeLine)
+        self.breakButton = QPushButton("Linie unterbrechen")
+        self.breakButton.clicked.connect(self.breakLine)
+        self.endButton = QPushButton("Messung beenden")
+        self.endButton.clicked.connect(self.reject)
+        
+        buttonLayout = QHBoxLayout()
+        buttonLayout.addWidget(self.breakButton)
+        buttonLayout.addWidget(self.closeButton)
+        buttonLayout.addWidget(self.endButton)
+        
+        mainLayout.addLayout(buttonLayout)
+        
+        self.setLayout(mainLayout)
+        
         self.move(0,0)
         self.timer = QTimer(self)
         self.timer.setInterval(500)
@@ -526,8 +546,42 @@ class QtWaitForPolyLine(QMessageBox):
                 obj.data.edges.add(1)
                 obj.data.edges[-1].vertices = [len(obj.data.vertices)-1, len(obj.data.vertices)-2]
             bpy.data.scenes[0].update()
-            # self.timer.stop()
-            # self.accept()
+            
+    def closeLine(self):
+        print("closing line")
+        obj = getSelectedObject()
+        obj.data.edges.add(1)
+        obj.data.edges[-1].vertices = [len(obj.data.vertices)-1, 0]
+        bpy.data.scenes[0].update()
+        bpy.data.scenes[0].objects.active = obj
+        context = getContext()
+        context["active_object"] = obj
+        # context["object"] = obj
+        # context["active_object"] = obj
+        # context["scene"] = bpy.data.scenes[0]
+        # context["edit_object"] = None
+        print(context)
+        bpy.ops.object.mode_set(context, mode='EDIT')
+        b = bmesh.from_edit_mesh(obj.data)
+        #mark edeges for freestyle render (select all edges first)
+        for e in b.edges:
+            e.select=True
+        bpy.ops.mesh.mark_freestyle_edge(context, clear=False)
+        #fill
+        bpy.ops.mesh.fill(context)
+        #recalculate normals
+        bpy.ops.mesh.normals_make_consistent(context)
+        bpy.ops.object.mode_set(context, mode='OBJECT')
+        #make shading smooth
+        bpy.ops.object.shade_smooth()
+        #deselect the object so the next measurment starts a new mesh
+        obj.select = False
+        
+    def breakLine(self):
+        print("breaking line")
+        obj = getSelectedObject()
+        #deselect the object so the next measurment starts a new mesh
+        obj.select = False
                 
 
         
