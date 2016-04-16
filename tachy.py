@@ -98,7 +98,7 @@ class TachyConnection:
         rawStr = self.readline().strip()
         mStr = rawStr[1:]
         if rawStr[0] != "*":
-            raise TachyError("Unexpected character at start of measurement: '%s'" % star)
+            raise TachyError("Unexpected character at start of measurement: '%s'" % rawStr[0])
 
             
         data_point = {}
