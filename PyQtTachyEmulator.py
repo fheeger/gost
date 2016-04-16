@@ -62,11 +62,17 @@ class MeassureWindow(QDialog):
         super(MeassureWindow, self).__init__(parent)
         
         self.xField = QLineEdit()
+        self.xField.setText("0")
         self.yField = QLineEdit()
+        self.yField.setText("0")
         self.zField = QLineEdit()
+        self.zField.setText("0")
         self.hzField = QLineEdit()
+        self.hzField.setText("0")
         self.vertField = QLineEdit()
+        self.vertField.setText("0")
         self.distField = QLineEdit()
+        self.distField.setText("0")
         
         mainLayout = QGridLayout()
         mainLayout.addWidget(QLabel("x:"), 0, 0)
@@ -220,8 +226,10 @@ class TachyEmulator(QWidget):
         self.connection.write("*%s\r\n" % data)
         self.connection.write("w\r\n")
         answer = self.connection.readIntoBuffer(timeout=1)
-        if answer.strip() != "OK":
-            print("Kommunikation Fehlgeschlagen\n")
+        if answer is None:
+            QMessageBox.critical(self, "Timeout", "Connection with Blender timed out. Make sure it is waiting for a measurment.")
+        elif answer.strip() != "OK":
+            QMessageBox.critical(self, "Unexpected Answer from Blender", "Blender answered: %s" % answer)
         else:
             self.ptNr += 1
             print("Messung erfolgreich\n")
