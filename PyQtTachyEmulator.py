@@ -1,5 +1,7 @@
-import sys
+import sys, random, time
 from glob import glob
+
+import numpy
 
 from PyQt5.QtCore import QObject, QTimer
 from PyQt5.QtWidgets import *
@@ -111,7 +113,71 @@ class MeassureWindow(QDialog):
                               )
         super(MeassureWindow, self).accept()
         
- 
+class RandomCircleWindow(QDialog):
+    def __init__(self, parent):
+        super(RandomCircleWindow, self).__init__(parent)
+        
+        self.xField = QLineEdit()
+        self.xField.setText("0")
+        self.yField = QLineEdit()
+        self.yField.setText("0")
+        self.zField = QLineEdit()
+        self.zField.setText("0")
+        self.rField = QLineEdit()
+        self.rField.setText("3")
+        self.nField = QLineEdit()
+        self.nField.setText("20")
+        self.hField = QLineEdit()
+        self.hField.setText("0")
+        self.meassureButton = QPushButton("Meassure")
+        
+        mainLayout = QGridLayout()
+        mainLayout.addWidget(QLabel("Circle center x:"), 0, 0)
+        mainLayout.addWidget(self.xField , 0, 1)
+        mainLayout.addWidget(QLabel("Circle center y:"), 1, 0)
+        mainLayout.addWidget(self.yField , 1, 1)
+        mainLayout.addWidget(QLabel("Circle center z:"), 2, 0)
+        mainLayout.addWidget(self.zField , 2, 1)
+        mainLayout.addWidget(QLabel("Circle radius:"), 3, 0)
+        mainLayout.addWidget(self.rField , 3, 1)
+        mainLayout.addWidget(QLabel("Number of points:"), 4, 0)
+        mainLayout.addWidget(self.nField , 4, 1)
+        mainLayout.addWidget(QLabel("Circle height:"), 5, 0)
+        mainLayout.addWidget(self.hField , 5, 1)
+        
+        self.okButton = QPushButton("Ok")
+        self.cancleButton = QPushButton("Cancel")
+        
+        mainLayout.addWidget(self.okButton)
+        mainLayout.addWidget(self.cancleButton)
+        
+        self.setLayout(mainLayout)
+        
+        self.okButton.clicked.connect(self.accept) 
+        self.cancleButton.clicked.connect(self.reject)
+        
+    def accept(self):
+        x = float(self.xField.text())
+        y = float(self.yField.text())
+        z = float(self.zField.text())
+        r = float(self.rField.text())
+        n = int(self.nField.text())
+        h = float(self.hField.text())
+        self.measureRandomPolyCircle(x,y,z,r,n,h)
+        super(RandomCircleWindow, self).accept()
+        
+    def measureRandomPolyCircle(self, x0=0, y0=0, z0=0, r=3, n=20, h=2):
+        angles = []
+        for i in range(n):
+            angles.append(random.uniform(0, 2*numpy.pi))
+        angles.sort()
+        for a in angles:
+            x = x0 + r*numpy.cos(a)
+            y = y0 + r*numpy.sin(a)
+            z = z0 + random.uniform(0, h)
+            self.parentWidget().anyPoint(x, y, z, a, 0, r)
+            time.sleep(0.5)
+        
 class TachyEmulator(QWidget):
     def __init__(self, dev, parent=None):
         super(TachyEmulator, self).__init__(parent)
@@ -152,13 +218,15 @@ class TachyEmulator(QWidget):
         stateLayout.addWidget(self.instrumentHeightLabel, 5, 1)
         
         self.meassureButton = QPushButton("Meassure Point")
+        self.circleButton = QPushButton("Meassure random circle")
         self.meassureButton.setEnabled(False)
-
+        self.circleButton.setEnabled(False)
 
         mainLayout = QVBoxLayout()
         mainLayout.addWidget(self.selectPort)
         mainLayout.addLayout(stateLayout)
         mainLayout.addWidget(self.meassureButton)
+        mainLayout.addWidget(self.circleButton)
        
         self.setLayout(mainLayout)
                
@@ -173,6 +241,7 @@ class TachyEmulator(QWidget):
         timer.start(100)
         
         self.meassureButton.clicked.connect(self.meassurePoint) 
+        self.circleButton.clicked.connect(self.measureRandomPolyCircle)
         self.selectPort.activated[str].connect(self.connect)
 
         
@@ -238,6 +307,10 @@ class TachyEmulator(QWidget):
         meassureWindow = MeassureWindow(self)
         meassureWindow.exec_()
         
+    def measureRandomPolyCircle(self):
+        circleWindow = RandomCircleWindow(self)
+        circleWindow.exec_()
+    
     def avail_ports(self):
         if sys.platform[:3] == "win":
             possible = ["COM%i" % i for i in range(1,255)]
@@ -258,6 +331,7 @@ class TachyEmulator(QWidget):
         print("connecting to port: %s" % port)
         self.connection.connect(port)
         self.meassureButton.setEnabled(True)
+        self.circleButton.setEnabled(True)
             
 class NotConnectedError(IOError):
     pass
