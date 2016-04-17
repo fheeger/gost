@@ -533,6 +533,16 @@ class QtWaitForPolyLine(QDialog):
         
         self.setLayout(mainLayout)
         
+        #short cut keys
+        closeKeyC = QShortcut(QKeySequence("C"), self)
+        closeKeyC.activated.connect(self.closeLine)
+        closeKeyS = QShortcut(QKeySequence("S"), self)
+        closeKeyS.activated.connect(self.closeLine)
+        breakKeyB = QShortcut(QKeySequence("B"), self)
+        breakKeyB.activated.connect(self.breakLine)
+        breakKeyU = QShortcut(QKeySequence("U"), self)
+        breakKeyU.activated.connect(self.breakLine)
+        
         self.move(0,0)
         self.timer = QTimer(self)
         self.timer.setInterval(500)
