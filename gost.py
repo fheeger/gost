@@ -423,8 +423,16 @@ class QtGostStation(QDialog):
 
     def addPoint(self, result):
         if result == QDialog.Accepted:
-            self.pointList.setRowCount(self.pointList.rowCount() + 1)
             name = getSelectedObject().name
+            #was this point already added?
+            for i in range(self.pointList.rowCount()):
+                if self.pointList.item(0, 0).text() == name:
+                    QMessageBox.critical(self, "Punkt Bereits Vorhanden", "Dieser Punkt wurde bereits hinzugefügt.")
+                    self.wait.deleteLater()
+                    self.wait = None
+                    self.show()
+                    return
+            self.pointList.setRowCount(self.pointList.rowCount() + 1)
             x,y,z = getSelectedObject().location
             self.pointList.setItem(self.pointList.rowCount()-1, 0, QTableWidgetItem(name))
             self.pointList.setItem(self.pointList.rowCount()-1, 1, QTableWidgetItem(str(x)))
