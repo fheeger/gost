@@ -581,6 +581,14 @@ class QtWaitForPolyLine(QDialog):
     def closeLine(self):
         print("closing line")
         obj = getSelectedObject()
+        if obj is None:
+            QMessageBox.critical(self, "Kein Objekt Ausgewählt", 
+                                       "Es muss eine Linie ausgewählt sein um sie zu schließen.")
+            return
+        if len(obj.data.vertices) < 3:
+            QMessageBox.critical(self, "Zu Wenig Punkte", 
+                                       "Das ausgewählte Objekt enthält zu wenig Punkte zum schließen.")
+            return
         obj.data.edges.add(1)
         obj.data.edges[-1].vertices = [len(obj.data.vertices)-1, 0]
         bpy.data.scenes[0].update()
@@ -611,6 +619,10 @@ class QtWaitForPolyLine(QDialog):
     def breakLine(self):
         print("breaking line")
         obj = getSelectedObject()
+        if obj is None:
+            QMessageBox.critical(self, "Kein Objekt Ausgewählt", 
+                                 "Es muss eine Linie ausgewählt sein um sie zu unterbrechen.")
+            return
         #deselect the object so the next measurment starts a new mesh
         obj.select = False
                 
