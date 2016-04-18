@@ -16,6 +16,8 @@
 #along with GOST.  If not, see <http://www.gnu.org/licenses/>.
 
 import numpy as np
+import bpy
+
 
 def dist(p1, p2):
     return np.sqrt((p1[0]-p2[0])**2+(p1[1]-p2[1])**2)
@@ -103,3 +105,18 @@ def append_polar(dist=[0.0], angle_degr=[0.0], coord=[0,0,0]):
     ynew=ycoord+disty
     
     return(xnew, ynew)
+
+def getSelectedObject():
+    for obj in bpy.data.objects:
+        if obj.select:
+            return obj
+    return None
+
+def getContext():
+    for window in bpy.context.window_manager.windows:
+        screen = window.screen
+        for area in screen.areas:
+            if area.type == "VIEW_3D":
+                for region in area.regions:
+                    if region.type == "WINDOW":
+                        return {"window": window, "screen": screen, "area": area, "region": region}
