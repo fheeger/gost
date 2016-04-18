@@ -426,7 +426,7 @@ class QtGostStation(QDialog):
             name = getSelectedObject().name
             #was this point already added?
             for i in range(self.pointList.rowCount()):
-                if self.pointList.item(0, 0).text() == name:
+                if self.pointList.item(i, 0).text() == name:
                     QMessageBox.critical(self, "Punkt Bereits Vorhanden", "Dieser Punkt wurde bereits hinzugefügt.")
                     self.wait.deleteLater()
                     self.wait = None
