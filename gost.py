@@ -17,6 +17,9 @@
 
 
 import sys
+import os
+import time
+
 import bpy
 import bmesh
 from mathutils import Vector
@@ -29,6 +32,48 @@ from PyQt5.QtCore import QTimer, Qt
 from .tachy import TachyConnection, Timeout
 from .util import getSelectedObject, getContext, rad2gon
 
+class MeasureLog(object):
+    knownFormats = ["std", "dat"]
+    
+    def __init__(self, outPath=None, format="std", append=False):
+        self.measurments = []
+        if format not in self.knownFormats:
+            raise ValueError("%s is not a known format" % format)
+        self.format = format
+        if append:
+            mode = "a"
+        else:
+            mode = "w"
+        if outPath is None:
+            outPath = os.path.join(os.path.expanduser("~"),  "%s_gostlog.txt" % time.strftime("%Y-%m-%d_%H-%M-%S"))
+        self.out = open(outPath, mode)
+        
+    def __del__(self):
+        self.out.flush()
+        self.out.close()
+        
+    def addPoint(self, pData):
+        self.measurments.append((time.localtime(), pData))
+        self.out.write(self.formatLine())
+        self.out.flush()
+        
+    def formatLine(self, line=None, lineNr=None):
+        if line is None:
+            line = self.measurments[-1]
+            lineNr = len(self.measurments)
+        if self.format == "std":
+            return time.strftime("%d %b %Y %H:%M:%S") + "\t%(ptid)s\t%(targetEast).3f\t%(targetNorth).3f\t%(targetHeight).3f\n" % line[1]
+        elif self.format == "dat":
+            return str(lineNr) + "\t%(ptid)s\tX\t%(targetEast).3f\tY\t%(targetNorth).3f\tZ\t%(targetHeight).3f\n" % line[1]
+        else:
+            raise ValueError("%s is not a known format" % self.format)
+    
+    def writeAll(self, outPath):
+        with open(outPath, "w") as out:
+            for l, line in enumerate(self.measurments):
+                out.write(self.formatLine(line, l))
+        
+    
 class QtGostApp(QWidget):
     def __init__(self, parent=None):
         super(QtGostApp, self).__init__(parent)
@@ -58,6 +103,7 @@ class QtGostApp(QWidget):
         self.layoutButton.clicked.connect(self.newLayout)
         
         self.connection = TachyConnection()
+        self.log = MeasureLog(format="dat")
         
         self.setWindowTitle("GeO Survey Tool - GOST")
         self.setWindowIcon(QIcon('gost.png'))  
@@ -553,6 +599,7 @@ class QtWaitForPolyLine(QDialog):
     def pollMeasurement(self):
         try:
             measurement = self.parentWidget().connection.readMeasurement()
+            self.parentWidget().log.addPoint(measurement)
         except Timeout:
             pass
         else:
@@ -664,6 +711,7 @@ class QtWaitForMeasurement(QMessageBox):
 
     def pollTachy(self):
         self.data = self.parentWidget().parentWidget().connection.readMeasurement()
+        self.parentWidget().parentWidget().log.addPoint(self.data)
         self.timer.stop()
         self.accept()
  
