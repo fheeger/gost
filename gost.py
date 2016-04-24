@@ -57,21 +57,23 @@ class MeasureLog(object):
         self.out.write(self.formatLine())
         self.out.flush()
         
-    def formatLine(self, line=None, lineNr=None):
+    def formatLine(self, line=None, lineNr=None, format=None):
         if line is None:
             line = self.measurments[-1]
             lineNr = len(self.measurments)
-        if self.format == "std":
+        if format is None:
+            format = self.format
+        if format == "std":
             return time.strftime("%d %b %Y %H:%M:%S") + "\t%(ptid)s\t%(targetEast).3f\t%(targetNorth).3f\t%(targetHeight).3f\n" % line[1]
-        elif self.format == "dat":
+        elif format == "dat":
             return str(lineNr) + "\t%(ptid)s\tX\t%(targetEast).3f\tY\t%(targetNorth).3f\tZ\t%(targetHeight).3f\n" % line[1]
         else:
-            raise ValueError("%s is not a known format" % self.format)
+            raise ValueError("%s is not a known format" % format)
     
-    def writeAll(self, outPath):
+    def writeAll(self, outPath, format=None):
         with open(outPath, "w") as out:
             for l, line in enumerate(self.measurments):
-                out.write(self.formatLine(line, l))
+                out.write(self.formatLine(line, l+1, format))
         
     
 class QtGostApp(QWidget):
@@ -84,6 +86,7 @@ class QtGostApp(QWidget):
         self.measurePolyButton = QPushButton("Poly-Linie messen")
         self.settingsButton = QPushButton("Standart Einstellungen")
         self.layoutButton = QPushButton("Neues Ansichtsfenster")
+        self.exportMeasurmentsButton = QPushButton("Messungen Exportieren")
         self.stationButton.setEnabled(False)
         
         mainLayout = QBoxLayout(2)
@@ -93,6 +96,7 @@ class QtGostApp(QWidget):
         mainLayout.addWidget(self.measurePolyButton)
         mainLayout.addWidget(self.settingsButton)
         mainLayout.addWidget(self.layoutButton)
+        mainLayout.addWidget(self.exportMeasurmentsButton)
         self.setLayout(mainLayout)
         
         self.connectButton.clicked.connect(self.openConnectWindow)
@@ -101,6 +105,7 @@ class QtGostApp(QWidget):
         self.setStationButton.clicked.connect(self.openSetStationWindow)
         self.measurePolyButton.clicked.connect(self.measurePoly)
         self.layoutButton.clicked.connect(self.newLayout)
+        self.exportMeasurmentsButton.clicked.connect(self.exportMeasurments)
         
         self.connection = TachyConnection()
         self.log = MeasureLog(format="dat")
@@ -219,7 +224,9 @@ class QtGostApp(QWidget):
         self.mes = None
         
         
-
+    def exportMeasurments(self):
+        exportWindow = QtGostExportWindow(self)
+        exportWindow.show()
     
 class QtGostSettings(QDialog):
     
@@ -748,7 +755,33 @@ class QtSetStation(QDialog):
         a = float(self.angleField.text())
         self.parentWidget().connection.setStation(p, a)
         super(QtSetStation, self).accept()
- 
+
+class QtGostExportWindow(QDialog):
+    def __init__(self, parent=None):
+        super(QtGostExportWindow, self).__init__(parent)
+        mainLayout = QGridLayout()
+        self.setLayout(mainLayout)
+        
+        self.selectFormat = QComboBox(self)
+        for format in self.parentWidget().log.knownFormats:
+            self.selectFormat.addItem(format)
+        
+        self.saveButton = QPushButton("Speichern")
+        
+        mainLayout.addWidget(QLabel("Format auswählen:"), 0, 0)
+        mainLayout.addWidget(self.selectFormat, 0, 1)
+        mainLayout.addWidget(self.saveButton, 1,1)
+        self.saveButton.clicked.connect(self.save)
+
+    def save(self):
+        fileName = QFileDialog.getSaveFileName(self, "Messungen exporiteren", os.path.expanduser("~"))[0]
+        print(fileName)
+        if len(fileName) == 0:
+            self.reject()
+        else:
+            self.parentWidget().log.writeAll(fileName, self.selectFormat.currentText())
+            self.accept()
+        
 # class QtNivel(QDialog):
     # def __init__(self, parent=None):
         # super(QtNivel, self).__init__(parent)
