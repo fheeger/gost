@@ -107,10 +107,13 @@ def append_polar(dist=[0.0], angle_degr=[0.0], coord=[0,0,0]):
     return(xnew, ynew)
 
 def getSelectedObject():
+    rv = None
     for obj in bpy.data.objects:
         if obj.select:
-            return obj
-    return None
+            if not rv is None:
+                raise ValueError("More than one object selected")
+            rv = obj
+    return rv
 
 def getContext():
     for window in bpy.context.window_manager.windows:

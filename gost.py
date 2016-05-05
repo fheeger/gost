@@ -477,8 +477,7 @@ class QtGostStation(QDialog):
     def startAddPoint(self):
         for obj in bpy.data.objects:
             obj.select = False
-        nowSelected =  getSelectedObject()
-        self.wait = QtWaitForSelection(nowSelected, self)
+        self.wait = QtWaitForSelection(self)
         self.wait.setWindowModality(Qt.ApplicationModal)
         self.wait.show()
         self.hide()
@@ -486,7 +485,7 @@ class QtGostStation(QDialog):
 
     def addPoint(self, result):
         if result == QDialog.Accepted:
-            name = getSelectedObject().name
+            name = self.wait.selected.name
             #was this point already added?
             for i in range(self.pointList.rowCount()):
                 if self.pointList.item(i, 0).text() == name:
@@ -496,7 +495,7 @@ class QtGostStation(QDialog):
                     self.show()
                     return
             self.pointList.setRowCount(self.pointList.rowCount() + 1)
-            x,y,z = getSelectedObject().location
+            x,y,z = self.wait.selected.location
             self.pointList.setItem(self.pointList.rowCount()-1, 0, QTableWidgetItem(name))
             self.pointList.setItem(self.pointList.rowCount()-1, 1, QTableWidgetItem(str(x)))
             self.pointList.setItem(self.pointList.rowCount()-1, 2, QTableWidgetItem(str(y)))
@@ -625,26 +624,36 @@ class QtWaitForPolyLine(QDialog):
             y = measurement["targetNorth"]
             z = measurement["targetHeight"] 
             #bpy.context.area.type='VIEW_3D'
-            if getSelectedObject() is None:
-                print("No object selected")
-                mesh = bpy.data.meshes.new(name="New Mesh")
-                mesh.from_pydata([Vector((0,0,0))], [], [])
-                obj = bpy.data.objects.new("New Object", mesh)
-                obj.location = (x,y,z)
-                bpy.data.scenes[0].objects.link(obj)
-                obj.select=True
-            else:  
+            try:
                 obj = getSelectedObject()
-                obj.data.vertices.add(1)
-                ol = obj.location
-                obj.data.vertices[-1].co = (x-ol[0], y-ol[1], z-ol[2])
-                obj.data.edges.add(1)
-                obj.data.edges[-1].vertices = [len(obj.data.vertices)-1, len(obj.data.vertices)-2]
-            bpy.data.scenes[0].update()
+            except ValueError:
+                QMessageBox.critical(self, "Mehrer Objekt Ausgewählt", 
+                                     "Es darf nicht mehr als ein Objekt ausgewählt sein.")
+            else:
+                if obj is None:
+                    print("No object selected")
+                    mesh = bpy.data.meshes.new(name="New Mesh")
+                    mesh.from_pydata([Vector((0,0,0))], [], [])
+                    obj = bpy.data.objects.new("New Object", mesh)
+                    obj.location = (x,y,z)
+                    bpy.data.scenes[0].objects.link(obj)
+                    obj.select=True
+                else:  
+                    obj.data.vertices.add(1)
+                    ol = obj.location
+                    obj.data.vertices[-1].co = (x-ol[0], y-ol[1], z-ol[2])
+                    obj.data.edges.add(1)
+                    obj.data.edges[-1].vertices = [len(obj.data.vertices)-1, len(obj.data.vertices)-2]
+                bpy.data.scenes[0].update()
             
     def closeLine(self):
         print("closing line")
-        obj = getSelectedObject()
+        try:
+            obj = getSelectedObject()
+        except ValueError:
+            QMessageBox.critical(self, "Mehrer Objekt Ausgewählt", 
+                                 "Es darf nicht mehr als ein Objekt ausgewählt sein.")
+            return
         if obj is None:
             QMessageBox.critical(self, "Kein Objekt Ausgewählt", 
                                        "Es muss eine Linie ausgewählt sein um sie zu schließen.")
@@ -682,7 +691,12 @@ class QtWaitForPolyLine(QDialog):
         
     def breakLine(self):
         print("breaking line")
-        obj = getSelectedObject()
+        try:
+            obj = getSelectedObject()
+        except ValueError:
+            QMessageBox.critical(self, "Mehrer Objekt Ausgewählt", 
+                                 "Es darf nicht mehr als ein Objekt ausgewählt sein.")
+            return
         if obj is None:
             QMessageBox.critical(self, "Kein Objekt Ausgewählt", 
                                  "Es muss eine Linie ausgewählt sein um sie zu unterbrechen.")
@@ -693,7 +707,7 @@ class QtWaitForPolyLine(QDialog):
 
         
 class QtWaitForSelection(QMessageBox):
-    def __init__(self, nowSelected, parent=None):
+    def __init__(self, parent=None):
         super(QtWaitForSelection, self).__init__(QMessageBox.Question, "Warte auf Auswahl",
                                                  "Bitte wählen sie ein Object im 3d view  aus",
                                                  buttons=QMessageBox.Cancel,
@@ -703,15 +717,21 @@ class QtWaitForSelection(QMessageBox):
         self.timer.setInterval(50)
         self.timer.timeout.connect(self.pollSelection)
         self.timer.start()
-        self.oldSelected = nowSelected
-        self.newSelected = None
+        self.selected = None
 
     def pollSelection(self):
-        nowSelected = getSelectedObject()
-        if not nowSelected == self. oldSelected:
-            self.newSelected = nowSelected
-            self.timer.stop()
-            self.accept()
+        try:
+            nowSelected = getSelectedObject()
+        except ValueError:
+            QMessageBox.critical(self, "Mehrer Objekt Ausgewählt", 
+                                 "Es darf nicht mehr als ein Objekt ausgewählt sein.")
+            for obj in bpy.data.objects:
+                obj.select = False
+        else:
+            if not nowSelected is None:
+                self.selected = nowSelected
+                self.timer.stop()
+                self.accept()
 
 class QtWaitForMeasurement(QMessageBox):
     def __init__(self, index, parent=None):
