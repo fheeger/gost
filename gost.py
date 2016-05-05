@@ -222,6 +222,10 @@ class QtGostApp(QWidget):
         event.accept()
         
     def measurePoly(self):
+        if not self.connection.connected:
+            QMessageBox.critical(self, "Tachymeter nicht verbunden", 
+                                 "Es muss zuerst eine Verbindung zum Tachymeter hergestellt werden.")
+            return
         self.mes = QtWaitForPolyLine(self)
         self.mes.setWindowModality(Qt.ApplicationModal)
         self.mes.finished.connect(self.stopMeasurePoly)
