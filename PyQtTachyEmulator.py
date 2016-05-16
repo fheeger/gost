@@ -3,59 +3,69 @@ from glob import glob
 
 import numpy
 
-from PyQt5.QtCore import QObject, QTimer
+from PyQt5.QtCore import QObject, QTimer, QIODevice
 from PyQt5.QtWidgets import *
-
-import serial
+from PyQt5 import QtSerialPort
 
 class TachyConnection(QObject):
 
-    def __init__(self, dev=None, baut=4800, lineend="\r\n", log=sys.stderr):
+    def __init__(self, dev=None, baut=4800, lineend="\r\n", timeout=3, log=sys.stderr):
         super(TachyConnection, self).__init__()
         self.log = log
         self.lineend = lineend
         if dev is None:
             self.port = None
         else:
-            self.port = serial.Serial(dev, baut)
+            sel.connect(dev, baut)
         self.buffer = ""
+        self.timeout = timeout
         
     def connect(self, dev, baut=4800):
-        self.port = serial.Serial(dev, baut)
+        self.port = QtSerialPort.QSerialPort(dev)
+        self.port.open(QIODevice.ReadWrite)
+        self.port.setBaudRate(baut)
         
     def readline(self):
         if self.port is None:
             raise NotConnectedError
-        line = self.port.readline().decode("ascii")
-        self.log.write("READ LINE: %s" % line)
-        return line
+        if self.port.waitForReadyRead(self.timeout*1000):
+            line = self.port.readLine().decode("ascii")
+            self.log.write("READ LINE: %s" % line)
+            return line
+        raise QSerialPort.TimeoutError("time out while reading line")
         
     def write(self, data):
         if self.port is None:
             raise NotConnectedError
+            
         self.log.write("WRITE: %s\n" % repr(data))
         self.port.write(bytes(data, "ascii"))
+        if not self.port.waitForBytesWritten(self.timeout*1000):
+            raise QSerialPort.TimeoutError("time out while writing")
         
     def read(self, bytes=1, timeout=None):
         if self.port is None:
             raise NotConnectedError
         if not timeout is None:
             self.port.timeout = timeout
-        data = self.port.read(bytes).decode("ascii")
-        self.log.write("READ: %s\n" % data)
-        return data
+        if self.port.waitForReadyRead(self.timeout*1000):      
+            data = self.port.read(bytes).decode("ascii")
+            self.log.write("READ: %s\n" % data)
+            return data
+        raise QSerialPort.TimeoutError("time out while reading")
     
     def readIntoBuffer(self, bytes=100, timeout=0):
         if self.port is None:
             raise NotConnectedError
         if not timeout is None:
-            self.port.timeout = timeout
-        self.buffer += self.port.read(bytes).decode("ascii")
-        if self.buffer.find(self.lineend) != -1:
-            self.log.write("buffer: %s\n" % repr(self.buffer))
-            tmp = self.buffer[:self.buffer.find(self.lineend)]
-            self.buffer = self.buffer[self.buffer.find(self.lineend)+len(self.lineend):]
-            return tmp
+            self.timeout = timeout
+        if self.port.waitForReadyRead(self.timeout*1000):
+            self.buffer += self.port.read(bytes).decode("ascii")
+            if self.buffer.find(self.lineend) != -1:
+                self.log.write("buffer: %s\n" % repr(self.buffer))
+                tmp = self.buffer[:self.buffer.find(self.lineend)]
+                self.buffer = self.buffer[self.buffer.find(self.lineend)+len(self.lineend):]
+                return tmp
         return None
             
  
@@ -285,8 +295,10 @@ class TachyEmulator(QWidget):
                     self.updateStateDisplay()
                     self.connection.write("?\r\n")
                 else:
+                    print("could not process data: " + data)
                     self.connection.write("@W127\r\n")
             else:
+                print("could not process data: " + data)
                 self.connection.write("@W127\r\n")
             print("done processing data")
  
@@ -312,20 +324,21 @@ class TachyEmulator(QWidget):
         circleWindow.exec_()
     
     def avail_ports(self):
-        if sys.platform[:3] == "win":
-            possible = ["COM%i" % i for i in range(1,255)]
-        else:
-            possible = glob("/dev/tty[a-zA-Z]*")
-        ports = []
-        for p in possible:
-            try:
-                serial.Serial(p).close()
-            except serial.SerialException:
-                pass
-            else:
-                ports.append(p)
-        #ports.append("/dev/pts/18")
-        return ports
+        # if sys.platform[:3] == "win":
+            # possible = ["COM%i" % i for i in range(1,255)]
+        # else:
+            # possible = glob("/dev/tty[a-zA-Z]*")
+        # ports = []
+        # for p in possible:
+            # try:
+                # serial.Serial(p).close()
+            # except serial.SerialException:
+                # pass
+            # else:
+                # ports.append(p)
+        # #ports.append("/dev/pts/18")
+        # return ports
+        return [p.portName() for p in QtSerialPort.QSerialPortInfo.availablePorts() if not p.isBusy()]
 
     def connect(self, port):
         print("connecting to port: %s" % port)
