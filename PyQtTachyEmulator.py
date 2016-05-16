@@ -32,7 +32,7 @@ class TachyConnection(QObject):
             line = self.port.readLine().decode("ascii")
             self.log.write("READ LINE: %s" % line)
             return line
-        raise QSerialPort.TimeoutError("time out while reading line")
+        raise QtSerialPort.TimeoutError("time out while reading line")
         
     def write(self, data):
         if self.port is None:
@@ -41,7 +41,7 @@ class TachyConnection(QObject):
         self.log.write("WRITE: %s\n" % repr(data))
         self.port.write(bytes(data, "ascii"))
         if not self.port.waitForBytesWritten(self.timeout*1000):
-            raise QSerialPort.TimeoutError("time out while writing")
+            raise QtSerialPort.TimeoutError("time out while writing")
         
     def read(self, bytes=1, timeout=None):
         if self.port is None:
