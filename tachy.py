@@ -108,7 +108,7 @@ class TachyConnection:
         d = bytes(data, "latin-1")
         self.log.write("WRITE: %s\n" % d)
         self.port.write(d)
-        self.prt.flush()
+        self.port.flush()
         if not self.port.waitForBytesWritten(self.writeTimeout*1000):
             raise Timeout("Timeout during write")
 
