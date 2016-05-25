@@ -148,10 +148,12 @@ class TachyConnection:
 
     
     def setPosition(self, x, y, z=None):
+       
         self.write("PUT/84...0"+ "%0+17.d \r\n" % (x*10**self.digits["84"])) #easting -> x
         if self.read(3).strip() != "?":
             raise TachyError()
         self.write("PUT/85...0"+ "%0+17.d \r\n" % (y*10**self.digits["85"])) #northing -> y
+       
         if self.read(3).strip() != "?":
             raise TachyError()
         if not z is None:
@@ -162,11 +164,10 @@ class TachyConnection:
     def setAngle(self, alpha):
         self.write("PUT/21...2"+ "%0+17.d \r\n" % (alpha*10**self.digits["21"]))
         if self.read(3).strip() != "?":
-            raise TachyError()
+           raise TachyError()
             
     def getAngle(self):
         self.write("GET/M/WI21\r\n")
-        
         line = self.readline().strip()
         if line[0] != "*":
             raise TachyError()
@@ -344,7 +345,7 @@ class TachyConnection:
     def computeStation(self, timeout=60):
         oldTimeout = self.timeout
         self.timeout = timeout
-        self.port.write_timout = timeout
+        self.writeTimout = timeout
         (x, y), rotation, error = self.computeHorizontalPositionAndAngle()
         z = self.computeHeight(0)
         self.log.write("Position error: %f\n" % error)
@@ -354,18 +355,16 @@ class TachyConnection:
         
 
     def setStation(self, p, a, timeout=60):
+       
         oldTimeout = self.timeout
         self.timeout = timeout
-        self.port.write_timout = timeout
+        self.writeTimeout = timeout
         print("setting station")
-        self.setPosition(p[0], p[1], p[2])
         self.log.write("Position: %f, %f, %f\n" % p)
-        currentAngle = self.getAngle()
-        self.log.write("current angle: %f gon\n" % currentAngle)
-        self.log.write("rotation angle: %f gon\n" % rad2gon(a))
-        self.setAngle((currentAngle + rad2gon(a)) % 400)
+        self.setPosition(p[0], p[1], p[2])
+        self.log.write("setting angle to: %f gon\n" % a)
+        self.setAngle(a)
         self.stationed = True
-        self.port.write_timout = oldTimeout
         self.timeout = oldTimeout
             
     
