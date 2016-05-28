@@ -90,6 +90,8 @@ class QtGostApp(QWidget):
         self.layoutButton = QPushButton("Neues Ansichtsfenster")
         self.exportMeasurmentsButton = QPushButton("Messungen Exportieren")
         self.stationButton.setEnabled(False)
+        self.measurePolyButton.setEnabled(False)
+        self.setStationButton.setEnabled(False)
         
         logo = QLabel()
         logo.setGeometry(10,10,280,104)
@@ -275,6 +277,7 @@ class QtGostSettings(QDialog):
 
 
         self.SetDpi = QSpinBox()
+        mainLayout.addWidget(QLabel("Dpi:"), 3, 0)
         mainLayout.addWidget(self.SetDpi, 3, 1)
         self.SetDpi.setRange(50, 1000)
         try:
@@ -357,8 +360,7 @@ class QtGostSettings(QDialog):
 
         bpy.data.scenes[0].world.horizon_color = (1,1,1)
 
-        self.SetDpi.setDisplayIntegerBase(150)
-
+        self.SetDpi.setValue(150)
 
     def computeRes(self):
         dpi = self.SetDpi.value()
@@ -430,6 +432,9 @@ class QtGostConnect(QDialog):
         self.parentWidget().connection.open(port, bautrate)
         self.parentWidget().connectButton.setEnabled(False)
         self.parentWidget().stationButton.setEnabled(True)
+        self.parentWidget().measurePolyButton.setEnabled(True)
+        self.parentWidget().setStationButton.setEnabled(True)
+   
         # self.meassureButton.setEnabled(True)
         super(QtGostConnect, self).accept()
     
@@ -506,6 +511,7 @@ class QtGostStation(QDialog):
                     return
             self.pointList.setRowCount(self.pointList.rowCount() + 1)
             x,y,z = self.wait.selected.location
+      
             self.pointList.setItem(self.pointList.rowCount()-1, 0, QTableWidgetItem(name))
             self.pointList.setItem(self.pointList.rowCount()-1, 1, QTableWidgetItem(str(x)))
             self.pointList.setItem(self.pointList.rowCount()-1, 2, QTableWidgetItem(str(y)))
@@ -540,6 +546,7 @@ class QtGostStation(QDialog):
         
     def measurePoint(self):
         self.pointData[self.measure.index] = self.measure.data
+        
         self.pointList.item(self.measure.index, 0).setBackground(QColor(0,200,0))
         self.measure.deleteLater()
         self.measure = None
