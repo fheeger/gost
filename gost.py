@@ -759,8 +759,9 @@ class QtWaitForMeasurement(QMessageBox):
 
     def recieveMeasurment(self):
         self.data = self.parentWidget().parentWidget().connection.readMeasurement()
-        self.parentWidget().parentWidget().log.addPoint(self.data)
-        self.accept()
+        if not self.data is None:
+            self.parentWidget().parentWidget().log.addPoint(self.data)
+            self.accept()
  
 class QtSetStation(QDialog):
     def __init__(self, parent=None):
