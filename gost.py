@@ -176,9 +176,10 @@ class QtGostApp(QWidget):
                 sel.name = name
         
         bpy.data.cameras[name].type = 'ORTHO'
-        
-        
-        
+        if not hasattr(bpy.types.Scene, "paperformat"):
+            bpy.types.Scene.paperformat = 'A4'
+            
+
         if bpy.types.Scene.paperformat == 'A4':
             Paperwidth = 29.7
         elif bpy.types.Scene.paperformat == 'A3':
