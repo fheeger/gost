@@ -617,6 +617,10 @@ class QtWaitForPolyLine(QDialog):
         self.timer.timeout.connect(self.pollMeasurement)
         self.timer.start()
         
+        #deselect all objects
+        for obj in bpy.data.objects:
+            obj.select = False
+        
     def pollMeasurement(self):
         try:
             measurement = self.parentWidget().connection.readMeasurement()
