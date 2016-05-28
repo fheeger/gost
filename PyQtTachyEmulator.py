@@ -18,6 +18,7 @@ class TachyConnection(QObject):
         else:
             sel.connect(dev, baut)
         self.buffer = ""
+        self.lineBuffer = []
         self.timeout = timeout
         
     def connect(self, dev, baut=4800):
@@ -33,13 +34,31 @@ class TachyConnection(QObject):
             self.log.write("READ LINE: %s" % line)
             return line
         raise TimeoutError("time out while reading line")
+    
+    def readLines(self, n=2):
+        self.buffer += bytes(self.port.readAll()).decode("ascii")
+        #print("addinf data to buffer: %s" % repr(self.buffer))
+        pos = self.buffer.find(self.lineend)
+        while pos > 0:
+            self.lineBuffer.append(self.buffer[:pos])
+            print("adding data to line buffer: %s" % repr(self.buffer[:pos]))
+            self.buffer = self.buffer[pos+len(self.lineend):]
+            pos = self.buffer.find(self.lineend)
         
+        if len(self.lineBuffer) == n:
+            tmp = self.lineBuffer
+            self.lineBuffer = []
+            print("returning: %s" % tmp)
+            return tmp
+        return None
+    
     def write(self, data):
         if self.port is None:
             raise NotConnectedError
             
         self.log.write("WRITE: %s\n" % repr(data))
         self.port.write(bytes(data, "ascii"))
+        self.port.flush()
         if not self.port.waitForBytesWritten(self.timeout*1000):
             raise TimeoutError("time out while writing")
         
@@ -53,21 +72,7 @@ class TachyConnection(QObject):
             self.log.write("READ: %s\n" % data)
             return data
         raise TimeoutError("time out while reading")
-    
-    def readIntoBuffer(self, bytes=100, timeout=0):
-        if self.port is None:
-            raise NotConnectedError
-        if not timeout is None:
-            self.timeout = timeout
-        if self.port.waitForReadyRead(self.timeout*1000):
-            self.buffer += self.port.read(bytes).decode("ascii")
-            if self.buffer.find(self.lineend) != -1:
-                self.log.write("buffer: %s\n" % repr(self.buffer))
-                tmp = self.buffer[:self.buffer.find(self.lineend)]
-                self.buffer = self.buffer[self.buffer.find(self.lineend)+len(self.lineend):]
-                return tmp
-        return None
-            
+     
  
 class MeassureWindow(QDialog):
     def __init__(self, parent):
@@ -246,14 +251,10 @@ class TachyEmulator(QWidget):
         
         self.connection = TachyConnection()
         
-        timer = QTimer(self)
-        timer.timeout.connect(self.processData) 
-        timer.start(100)
-        
         self.meassureButton.clicked.connect(self.meassurePoint) 
         self.circleButton.clicked.connect(self.measureRandomPolyCircle)
         self.selectPort.activated[str].connect(self.connect)
-
+        
         
     def updateStateDisplay(self):
         self.xLabel.setText(str(self.x))
@@ -264,10 +265,9 @@ class TachyEmulator(QWidget):
         self.instrumentHeightLabel.setText(str(self.instrumentHeight))
  
     def processData(self):
-        try:
-            data = self.connection.readIntoBuffer()
-        except NotConnectedError:
-            data = None
+        print("processing data")
+        data = self.connection.readLines(1)[0]
+        print(data)
         if not data is None:
             comArr = data.strip().split("/")
             if comArr[0] == "GET":
@@ -303,18 +303,23 @@ class TachyEmulator(QWidget):
             print("done processing data")
  
     def anyPoint(self, x, y, z, hz, vert, dist, reflectorH=0):
+        self.connection.port.readyRead.disconnect()
         data = "110006%+017.f 21.322%+017.f 22.322%+017.f 31..00%+017.f 81..00%+017.f 82..00%+017.f 83..00%+017.f 87..10%+017.f" % (self.ptNr, hz*10**5, vert*10**5, dist*10**3, x*10**3, y*10**3, z*10**3, reflectorH*10**3)
         self.connection.write("*%s\r\n" % data)
         self.connection.write("w\r\n")
-        answer = self.connection.readIntoBuffer(timeout=1)
-        if answer is None:
-            QMessageBox.critical(self, "Timeout", "Connection with Blender timed out. Make sure it is waiting for a measurment.")
-        elif answer.strip() != "OK":
+        lines = None
+        while lines is None:
+            self.connection.port.waitForReadyRead(500)
+            lines = self.connection.readLines(1)
+        answer = lines[0]
+        self.connection.port.readyRead.connect(self.processData)
+        if answer.strip() != "OK":
             QMessageBox.critical(self, "Unexpected Answer from Blender", "Blender answered: %s" % answer)
         else:
             self.ptNr += 1
             print("Messung erfolgreich\n")
             
+    
     def meassurePoint(self):
         meassureWindow = MeassureWindow(self)
         meassureWindow.exec_()
@@ -324,20 +329,6 @@ class TachyEmulator(QWidget):
         circleWindow.exec_()
     
     def avail_ports(self):
-        # if sys.platform[:3] == "win":
-            # possible = ["COM%i" % i for i in range(1,255)]
-        # else:
-            # possible = glob("/dev/tty[a-zA-Z]*")
-        # ports = []
-        # for p in possible:
-            # try:
-                # serial.Serial(p).close()
-            # except serial.SerialException:
-                # pass
-            # else:
-                # ports.append(p)
-        # #ports.append("/dev/pts/18")
-        # return ports
         return [p.portName() for p in QtSerialPort.QSerialPortInfo.availablePorts() if not p.isBusy()]
 
     def connect(self, port):
@@ -345,6 +336,7 @@ class TachyEmulator(QWidget):
         self.connection.connect(port)
         self.meassureButton.setEnabled(True)
         self.circleButton.setEnabled(True)
+        self.connection.port.readyRead.connect(self.processData)
             
 class NotConnectedError(IOError):
     pass
