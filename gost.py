@@ -19,15 +19,16 @@
 import sys
 import os
 import time
+import traceback
 
 import bpy
 import bmesh
 from mathutils import Vector
 
-import serial
+from PyQt5 import QtSerialPort
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
-from PyQt5.QtCore import QTimer, Qt
+from PyQt5.QtCore import QTimer, Qt, QIODevice
 
 from .tachy import TachyConnection, Timeout
 from .util import getSelectedObject, getContext, rad2gon
@@ -89,6 +90,8 @@ class QtGostApp(QWidget):
         self.layoutButton = QPushButton("Neues Ansichtsfenster")
         self.exportMeasurmentsButton = QPushButton("Messungen Exportieren")
         self.stationButton.setEnabled(False)
+        self.measurePolyButton.setEnabled(False)
+        self.setStationButton.setEnabled(False)
         
         logo = QLabel()
         logo.setGeometry(10,10,280,104)
@@ -199,22 +202,34 @@ class QtGostApp(QWidget):
         try:
             connectWindow = QtGostConnect(self)
             connectWindow.show()
-        except:
-            error=QErrorMessage(self)
-            error.showMessage('Can not connect to Tachy')
+        except Exception as e:
+            QMessageBox.critical(self, "Fehler", 
+                                 "Debug Inforamtionen:\n%s" % traceback.format_exc())
 
     
     def openStationWindow(self):
-        stationWindow = QtGostStation(self)
-        stationWindow.show()
+        try:
+            stationWindow = QtGostStation(self)
+            stationWindow.show()
+        except Exception as e:
+            QMessageBox.critical(self, "Fehler", 
+                                 "Debug Inforamtionen:\n%s" % traceback.format_exc())
         
     def openSetStationWindow(self):
-        setStationWindow = QtSetStation(self)
-        setStationWindow.show()
-        
+        try:
+            setStationWindow = QtSetStation(self)
+            setStationWindow.show()
+        except Exception as e:
+            QMessageBox.critical(self, "Fehler", 
+                                 "Debug Inforamtionen:\n%s" % traceback.format_exc())
+ 
     def openSettingsWindow(self):
-        settingsWindow = QtGostSettings(self)
-        settingsWindow.show()
+        try:
+            settingsWindow = QtGostSettings(self)
+            settingsWindow.show()
+        except Exception as e:
+            QMessageBox.critical(self, "Fehler", 
+                                 "Debug Inforamtionen:\n%s" % traceback.format_exc())
     
     def closeEvent(self, event):
         if self.connection.connected:
@@ -227,21 +242,28 @@ class QtGostApp(QWidget):
             QMessageBox.critical(self, "Tachymeter nicht verbunden", 
                                  "Es muss zuerst eine Verbindung zum Tachymeter hergestellt werden.")
             return
-        self.mes = QtWaitForPolyLine(self)
-        self.mes.setWindowModality(Qt.ApplicationModal)
-        self.mes.finished.connect(self.stopMeasurePoly)
-        self.mes.show()
+        try:
+            self.mes = QtWaitForPolyLine(self)
+            self.mes.setWindowModality(Qt.ApplicationModal)
+            self.mes.finished.connect(self.stopMeasurePoly)
+            self.mes.show()
+        except Exception as e:
+            QMessageBox.critical(self, "Fehler", 
+                                 "Debug Inforamtionen:\n%s" % traceback.format_exc())
         
     def stopMeasurePoly(self):
-        self.mes.timer.stop()
         self.connection.port.timeout=None
         self.mes.deleteLater()
         self.mes = None
         
         
     def exportMeasurments(self):
-        exportWindow = QtGostExportWindow(self)
-        exportWindow.show()
+        try:
+            exportWindow = QtGostExportWindow(self)
+            exportWindow.show()
+        except Exception as e:
+            QMessageBox.critical(self, "Fehler", 
+                         "Debug Inforamtionen:\n%s" % traceback.format_exc())
     
 class QtGostSettings(QDialog):
     
@@ -256,6 +278,7 @@ class QtGostSettings(QDialog):
 
 
         self.SetDpi = QSpinBox()
+        mainLayout.addWidget(QLabel("Dpi:"), 3, 0)
         mainLayout.addWidget(self.SetDpi, 3, 1)
         self.SetDpi.setRange(50, 1000)
         try:
@@ -338,8 +361,7 @@ class QtGostSettings(QDialog):
 
         bpy.data.scenes[0].world.horizon_color = (1,1,1)
 
-        self.SetDpi.setDisplayIntegerBase(150)
-
+        self.SetDpi.setValue(150)
 
     def computeRes(self):
         dpi = self.SetDpi.value()
@@ -402,21 +424,7 @@ class QtGostConnect(QDialog):
         self.cancleButton.clicked.connect(self.reject)
 
     def avail_ports(self):
-        if sys.platform[:3] == "win":
-            possible = ["COM%i" % i for i in range(1,255)]
-        else:
-            possible = glob("/dev/tty[a-zA-Z]*")
-        ports = []
-        for p in possible:
-            try:
-                serial.Serial(p).close()
-            except serial.SerialException:
-                pass
-            else:
-                ports.append(p)
-        # uncommend this line with the according path for pseudo ports in linux
-        #ports.append("/dev/pts/18")
-        return ports
+        return sorted([p.portName() for p in QtSerialPort.QSerialPortInfo.availablePorts() if not p.isBusy()])
 
     def accept(self):
         port = self.selectPort.currentText()
@@ -425,6 +433,9 @@ class QtGostConnect(QDialog):
         self.parentWidget().connection.open(port, bautrate)
         self.parentWidget().connectButton.setEnabled(False)
         self.parentWidget().stationButton.setEnabled(True)
+        self.parentWidget().measurePolyButton.setEnabled(True)
+        self.parentWidget().setStationButton.setEnabled(True)
+   
         # self.meassureButton.setEnabled(True)
         super(QtGostConnect, self).accept()
     
@@ -501,6 +512,7 @@ class QtGostStation(QDialog):
                     return
             self.pointList.setRowCount(self.pointList.rowCount() + 1)
             x,y,z = self.wait.selected.location
+      
             self.pointList.setItem(self.pointList.rowCount()-1, 0, QTableWidgetItem(name))
             self.pointList.setItem(self.pointList.rowCount()-1, 1, QTableWidgetItem(str(x)))
             self.pointList.setItem(self.pointList.rowCount()-1, 2, QTableWidgetItem(str(y)))
@@ -535,6 +547,7 @@ class QtGostStation(QDialog):
         
     def measurePoint(self):
         self.pointData[self.measure.index] = self.measure.data
+        
         self.pointList.item(self.measure.index, 0).setBackground(QColor(0,200,0))
         self.measure.deleteLater()
         self.measure = None
@@ -611,49 +624,47 @@ class QtWaitForPolyLine(QDialog):
         breakKeyU.activated.connect(self.breakLine)
         
         self.move(0,0)
-        self.timer = QTimer(self)
-        self.timer.setInterval(500)
-        self.parentWidget().connection.port.timeout=0.1
-        self.timer.timeout.connect(self.pollMeasurement)
-        self.timer.start()
+
+        self.parentWidget().connection.port.readyRead.connect(self.recieveMeasurment)
         
         #deselect all objects
         for obj in bpy.data.objects:
             obj.select = False
         
-    def pollMeasurement(self):
+    def recieveMeasurment(self):
+        oldTimeout = self.parentWidget().connection.timeout
+        self.parentWidget().connection.timeout = None
+        measurement = self.parentWidget().connection.readMeasurement()
+        self.parentWidget().connection.timeout = oldTimeout
+        if measurement is None:
+            return
+        print("measure")
+        x = measurement["targetEast"]
+        y = measurement["targetNorth"]
+        z = measurement["targetHeight"] 
+        #bpy.context.area.type='VIEW_3D'
+
         try:
-            measurement = self.parentWidget().connection.readMeasurement()
-            self.parentWidget().log.addPoint(measurement)
-        except Timeout:
-            pass
+            obj = getSelectedObject()
+        except ValueError:
+            QMessageBox.critical(self, "Mehrer Objekt Ausgewählt", 
+                                 "Es darf nicht mehr als ein Objekt ausgewählt sein.")
         else:
-            print("measure")
-            x = measurement["targetEast"]
-            y = measurement["targetNorth"]
-            z = measurement["targetHeight"] 
-            #bpy.context.area.type='VIEW_3D'
-            try:
-                obj = getSelectedObject()
-            except ValueError:
-                QMessageBox.critical(self, "Mehrer Objekt Ausgewählt", 
-                                     "Es darf nicht mehr als ein Objekt ausgewählt sein.")
-            else:
-                if obj is None:
-                    print("No object selected")
-                    mesh = bpy.data.meshes.new(name="New Mesh")
-                    mesh.from_pydata([Vector((0,0,0))], [], [])
-                    obj = bpy.data.objects.new("New Object", mesh)
-                    obj.location = (x,y,z)
-                    bpy.data.scenes[0].objects.link(obj)
-                    obj.select=True
-                else:  
-                    obj.data.vertices.add(1)
-                    ol = obj.location
-                    obj.data.vertices[-1].co = (x-ol[0], y-ol[1], z-ol[2])
-                    obj.data.edges.add(1)
-                    obj.data.edges[-1].vertices = [len(obj.data.vertices)-1, len(obj.data.vertices)-2]
-                bpy.data.scenes[0].update()
+            if obj is None:
+                print("No object selected")
+                mesh = bpy.data.meshes.new(name="New Mesh")
+                mesh.from_pydata([Vector((0,0,0))], [], [])
+                obj = bpy.data.objects.new("New Object", mesh)
+                obj.location = (x,y,z)
+                bpy.data.scenes[0].objects.link(obj)
+                obj.select=True
+            else:  
+                obj.data.vertices.add(1)
+                ol = obj.location
+                obj.data.vertices[-1].co = (x-ol[0], y-ol[1], z-ol[2])
+                obj.data.edges.add(1)
+                obj.data.edges[-1].vertices = [len(obj.data.vertices)-1, len(obj.data.vertices)-2]
+            bpy.data.scenes[0].update()
             
     def closeLine(self):
         print("closing line")
@@ -749,17 +760,14 @@ class QtWaitForMeasurement(QMessageBox):
                                                    buttons=QMessageBox.Cancel,
                                                    parent=parent)
         self.move(0,0)
-        self.timer = QTimer(self)
-        self.timer.setInterval(50)
-        self.index = index
-        self.timer.timeout.connect(self.pollTachy)
-        self.timer.start()
+        self.index = index  
+        self.parentWidget().parentWidget().connection.port.readyRead.connect(self.recieveMeasurment)
 
-    def pollTachy(self):
+    def recieveMeasurment(self):
         self.data = self.parentWidget().parentWidget().connection.readMeasurement()
-        self.parentWidget().parentWidget().log.addPoint(self.data)
-        self.timer.stop()
-        self.accept()
+        if not self.data is None:
+            self.parentWidget().parentWidget().log.addPoint(self.data)
+            self.accept()
  
 class QtSetStation(QDialog):
     def __init__(self, parent=None):
