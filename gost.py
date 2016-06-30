@@ -546,9 +546,10 @@ class QtGostStation(QDialog):
         self.measure.finished.connect(self.measurePoint)
         
     def measurePoint(self):
-        self.pointData[self.measure.index] = self.measure.data
-        
-        self.pointList.item(self.measure.index, 0).setBackground(QColor(0,200,0))
+        if hasattr(self.measure, "data"):
+            #if the measurement was canceled
+            self.pointData[self.measure.index] = self.measure.data
+            self.pointList.item(self.measure.index, 0).setBackground(QColor(0,200,0))
         self.measure.deleteLater()
         self.measure = None
         self.show()
@@ -775,10 +776,17 @@ class QtSetStation(QDialog):
         self.okButton = QPushButton("Ok")
         self.cancleButton = QPushButton("Abbrechen")
         self.xField = QLineEdit()
+          
         self.yField = QLineEdit()
         self.zField = QLineEdit()
         self.angleField = QLineEdit()
-                
+        
+        xpos,ypos,zpos=self.parentWidget().connection.getPosition() # getPosition fonction for tachy does not work
+   
+        self.xField.setText(str(xpos))   
+        self.yField.setText(str(ypos))
+        self.zField.setText(str(zpos))
+        self.angleField.setText(str(self.parentWidget().connection.getAngle()))        
         mainLayout = QGridLayout()
         mainLayout.addWidget(QLabel("X:"), 0, 0)
         mainLayout.addWidget(self.xField, 0, 1)
