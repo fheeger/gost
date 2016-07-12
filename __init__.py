@@ -16,6 +16,7 @@
 #along with GOST.  If not, see <http://www.gnu.org/licenses/>.
 
 
+#plugin information for Blender
 bl_info = {
     "name": "GOST: GeO Survey Tool",
     "author": "Lukas Fischer, Felix Heeger",
@@ -29,51 +30,21 @@ bl_info = {
     "category": "Import-Export"}
     
 
-# import sys
-# from glob import glob
-# import serial
-
-# import numpy
-# import bpy
-# import bmesh
-
-# from .tachy import TachyConnection, TachyError
-# from .util import dist, gon2rad, rad2gon
-
-
-
-
 import bpy
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import QEventLoop, Qt
 
 from .gost import QtGostApp
 
-context = None
- 
- 
-# def launch():
-    # # global context
-    # # context = bpy.context.copy()
-    # bpy.ops.wm.pyqt_event_loop()
- 
- 
-# register class stuff
-# class PyQtEventLoop(bpy.types.Operator):
-    # bl_idname = "wm.pyqt_event_loop"
-    # bl_label = "PyQt Event Loop"
-    # _timer = None
-    # _window = None
- 
-    # def execute(self, context):
-        # self._application = QApplication.instance()
-        # if self._application is None:
-            # self._application = QApplication(['blender'])
-        # self._eventLoop = QEventLoop()
-        # return {'RUNNING_MODAL'}
+#context = None
  
 
 class GostWindow(bpy.types.Operator):
+    """Mein Gost Window Class
+    
+    Subclassing Blender Operator to be displayed as a button.
+    Starts the PyQt event loop and will show Gost main window when clicked.
+    """
     bl_idname = "tachy.gost_window"
     bl_label = "Main Gost Window"
     bl_options = {"UNDO"}
@@ -82,13 +53,17 @@ class GostWindow(bpy.types.Operator):
         self._application = QApplication.instance()
         if self._application is None:
             self._application = QApplication(['blender'])
+        #create and start the PyQt event loop this is necessary,
+        # because we are not using a normal PyQt setup
         self._eventLoop = QEventLoop()
         self.window = QtGostApp()
+        #keep the window ontop of everything
         self.window.setWindowFlags(Qt.WindowStaysOnTopHint)
         self.window.show()
         return {'RUNNING_MODAL'}
         
 class TachyPanel(bpy.types.Panel):
+    """Blender panel to display the GOST button in"""
     bl_space_type = "VIEW_3D"
     bl_region_type = "TOOLS"
     bl_context = "objectmode"
@@ -98,17 +73,6 @@ class TachyPanel(bpy.types.Panel):
     def draw(self, context):
         layout = self.layout.column(align=True)
         layout.operator("tachy.gost_window", text="Start GeOSurveyTool")
-        # layout.operator_menu_enum("tachy.select_port", property="ports", text="Connect Tachymeter")
-        # layout = self.layout.column(align=True)
-        # layout.operator("tachy.station_point1", text="Station Point 1")
-        # layout.operator("tachy.add_station_point", text="Add Station Point")
-        # layout = self.layout.column(align=True)
-        # layout.operator("tachy.set_station", text="Compute Station")
-        # layout = self.layout.column(align=True)
-        # layout.operator("tachy.measure_niv", text="Measure Nivellemnet")
-        # layout.operator("tachy.measure_points", text="Measure Points")
-        
-
 
                 
 def register():
@@ -116,15 +80,3 @@ def register():
     
 def unregister():
     bpy.utils.unregister_module(__name__)
-
-    
-# def register():
-    # bpy.utils.register_class(PyQtEventLoop)
-# def unregister():
-    # bpy.utils.unregister_class(PyQtEventLoop)
-# try:
-    # unregister()
-# except:
-    # pass
-# register()
-# launch()
