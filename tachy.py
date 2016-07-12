@@ -262,7 +262,46 @@ class TachyConnection:
             line = lines[0]
             if line.strip() != "?":
                     raise TachyError("Unexpected answer from Tachy: %s" % repr(line))
-            
+      
+    def getPosition(self):
+        self.write("GET/M/WI84\r\n")    #problem : does not return x
+        lines = None
+        while lines is None:
+            self.port.waitForReadyRead(500)
+            lines = self.readLines(1)
+        line = lines[0]
+        word_index = line[1:3]
+        data = line[-17:]
+        if data[1]!="W":
+            xpos=float(data)/10**self.digits[word_index]
+        else:
+            xpos=0 
+        self.write("GET/M/WI85\r\n")    #problem : does not return y
+        lines = None
+        while lines is None:
+            self.port.waitForReadyRead(500)
+            lines = self.readLines(1)
+        line = lines[0]
+        word_index = line[1:3]
+        data = line[-17:]
+        if data[1]!="W":
+            ypos=float(data)/10**self.digits[word_index]
+        else:
+            ypos=0
+        self.write("GET/M/WI86\r\n")    #problem : does not return z
+        lines = None
+        while lines is None:
+            self.port.waitForReadyRead(500)
+            lines = self.readLines(1)
+        line = lines[0]
+        word_index = line[1:3]
+        data = line[-17:]
+        if data[1]!="W":
+            zpos=float(data)/10**self.digits[word_index]
+        else:
+            zpos=0
+        return (xpos,ypos,zpos)
+
     def setAngle(self, alpha):
         """Set the Tachymeter angle."""
         

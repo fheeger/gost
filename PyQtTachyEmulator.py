@@ -273,6 +273,12 @@ class TachyEmulator(QWidget):
             if comArr[0] == "GET":
                 if comArr[2] == "WI21":
                     self.connection.write("*21.322%0+17.d\r\n" % (self.hzAngle * 10**5))
+                elif comArr[2] == "WI84":
+                    self.connection.write("*84.322%0+17.d\r\n" % (self.x * 10**3)) 
+                elif comArr[2] == "WI85":
+                    self.connection.write("*85.322%0+17.d\r\n" % (self.y * 10**3))
+                elif comArr[2] == "WI86":
+                    self.connection.write("*86.322%0+17.d\r\n" % (self.z * 10**3))
                 elif comArr[2] == "WI88":
                     self.connection.write("*88.322%0+17.d\r\n" % (self.instrumentHeight * 10**3))
                 else:

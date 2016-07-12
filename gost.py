@@ -624,10 +624,13 @@ class QtGostStation(QDialog):
         """Process results from measuring a point"""
         #save the measured data into the list at the position that was given when 
         # opening the window
-        self.pointData[self.measure.index] = self.measure.data
+        if hasattr(self.measure, "data"):
+            #if the measurement was canceled this does not happen
+            self.pointData[self.measure.index] = self.measure.data
         #mark the row green
         self.pointList.item(self.measure.index, 0).setBackground(QColor(0,200,0))
         #close the meassage window and show the table window
+
         self.measure.deleteLater()
         self.measure = None
         self.show()
@@ -923,10 +926,17 @@ class QtSetStation(QDialog):
         self.okButton = QPushButton("Ok")
         self.cancleButton = QPushButton("Abbrechen")
         self.xField = QLineEdit()
+          
         self.yField = QLineEdit()
         self.zField = QLineEdit()
         self.angleField = QLineEdit()
-                
+        
+        xpos,ypos,zpos=self.parentWidget().connection.getPosition() # getPosition fonction for tachy does not work
+   
+        self.xField.setText(str(xpos))   
+        self.yField.setText(str(ypos))
+        self.zField.setText(str(zpos))
+        self.angleField.setText(str(self.parentWidget().connection.getAngle()))        
         mainLayout = QGridLayout()
         mainLayout.addWidget(QLabel("X:"), 0, 0)
         mainLayout.addWidget(self.xField, 0, 1)
