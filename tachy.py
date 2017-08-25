@@ -349,6 +349,21 @@ class TachyConnection:
         data = line[-17:]
         return float(data)/10**self.digits[word_index]
 
+    def setReflectorHeight(self, height):
+        """Set the Tachymeter angle."""
+        
+        #write the command to the serial port
+        # them command consists of a identifier (87) and the number in a format without a decimal point
+        self.write("PUT/87...0"+ "%0+17.d \r\n" % (height*10**self.digits["87"]))
+        #wait for aknowledgment from the Tachymeter
+        lines = None
+        while lines is None:
+            self.port.waitForReadyRead(500)
+            lines = self.readLines(1)
+        line = lines[0]
+        if line.strip() != "?":
+            raise TachyError("Unexpected answer from Tachy: %s" % repr(line))
+        
     def getInstrumentHeight(self):
         """Get the instrument height property of the Tachymeter."""
         
@@ -364,7 +379,22 @@ class TachyConnection:
         word_index = line[1:3]
         data = line[-17:]
         return float(data)/10**self.digits[word_index]
+    
+    def setInstrumentHeight(self, height):
+        """Set the Tachymeter angle."""
         
+        #write the command to the serial port
+        # them command consists of a identifier (88) and the number in a format without a decimal point
+        self.write("PUT/88...0"+ "%0+17.d \r\n" % (height*10**self.digits["88"]))
+        #wait for aknowledgment from the Tachymeter
+        lines = None
+        while lines is None:
+            self.port.waitForReadyRead(500)
+            lines = self.readLines(1)
+        line = lines[0]
+        if line.strip() != "?":
+            raise TachyError("Unexpected answer from Tachy: %s" % repr(line))
+    
     def beep(self):
         """Make the Tachymeter beep."""
         

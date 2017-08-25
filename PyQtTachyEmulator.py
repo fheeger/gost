@@ -203,6 +203,7 @@ class TachyEmulator(QWidget):
         self.hzAngle = 4.0
         self.vertAngle = 0.0
         self.instrumentHeight = 1.7
+        self.reflectorHeight = 1.5
         
         self.ptNr = 0
         
@@ -216,6 +217,7 @@ class TachyEmulator(QWidget):
         self.zLabel = QLabel("")
         self.hzAngleLabel = QLabel("")
         self.vertAngleLabel = QLabel("")
+        self.reflectorHeightLabel = QLabel("")
         self.instrumentHeightLabel = QLabel("")
         stateLayout = QGridLayout()
         
@@ -229,8 +231,10 @@ class TachyEmulator(QWidget):
         stateLayout.addWidget(self.hzAngleLabel, 3, 1)
         stateLayout.addWidget(QLabel("vertical Angle:"), 4, 0)
         stateLayout.addWidget(self.vertAngleLabel, 4, 1)
-        stateLayout.addWidget(QLabel("instrument Height:"), 5, 0)
-        stateLayout.addWidget(self.instrumentHeightLabel, 5, 1)
+        stateLayout.addWidget(QLabel("reflector Height:"), 5, 0)
+        stateLayout.addWidget(self.reflectorHeightLabel, 5, 1)
+        stateLayout.addWidget(QLabel("instrument Height:"), 6, 0)
+        stateLayout.addWidget(self.instrumentHeightLabel, 6, 1)
         
         self.meassureButton = QPushButton("Meassure Point")
         self.circleButton = QPushButton("Meassure random circle")
@@ -262,6 +266,7 @@ class TachyEmulator(QWidget):
         self.zLabel.setText(str(self.z))
         self.hzAngleLabel.setText(str(self.hzAngle))
         self.vertAngleLabel.setText(str(self.vertAngle))
+        self.reflectorHeightLabel.setText(str(self.reflectorHeight))
         self.instrumentHeightLabel.setText(str(self.instrumentHeight))
  
     def processData(self):
@@ -279,6 +284,8 @@ class TachyEmulator(QWidget):
                     self.connection.write("*85.322%0+17.d\r\n" % (self.y * 10**3))
                 elif comArr[2] == "WI86":
                     self.connection.write("*86.322%0+17.d\r\n" % (self.z * 10**3))
+                elif comArr[2] == "WI87":
+                    self.connection.write("*87.322%0+17.d\r\n" % (self.reflectorHeight * 10**3))
                 elif comArr[2] == "WI88":
                     self.connection.write("*88.322%0+17.d\r\n" % (self.instrumentHeight * 10**3))
                 else:
@@ -298,6 +305,14 @@ class TachyEmulator(QWidget):
                     self.connection.write("?\r\n")
                 elif comArr[1][:2] == "86":
                     self.z = float(comArr[1][-17:]) / 10**3
+                    self.updateStateDisplay()
+                    self.connection.write("?\r\n")
+                elif comArr[1][:2] == "87":
+                    self.reflectorHeight = float(comArr[1][-17:]) / 10**3
+                    self.updateStateDisplay()
+                    self.connection.write("?\r\n")
+                elif comArr[1][:2] == "88":
+                    self.instrumentHeight = float(comArr[1][-17:]) / 10**3
                     self.updateStateDisplay()
                     self.connection.write("?\r\n")
                 else:

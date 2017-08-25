@@ -114,6 +114,7 @@ class QtGostApp(QWidget):
         print(__file__)
         #create buttons
         self.connectButton = QPushButton("Mit Tachymeter verbinden")
+        self.heightButton = QPushButton("Höhen Einstellungen")
         self.stationButton = QPushButton("Freie Stationierung")
         self.setStationButton = QPushButton("Stationierung auf Punkt")
         self.measurePolyButton = QPushButton("Poly-Linie messen")
@@ -121,6 +122,7 @@ class QtGostApp(QWidget):
         self.layoutButton = QPushButton("Neues Ansichtsfenster")
         self.exportMeasurmentsButton = QPushButton("Messungen Exportieren")
         #deactivatee buttons that con not be used before a tachy was connected
+        self.heightButton.setEnabled(False)
         self.stationButton.setEnabled(False)
         self.measurePolyButton.setEnabled(False)
         self.setStationButton.setEnabled(False)
@@ -134,6 +136,7 @@ class QtGostApp(QWidget):
         #create layout for the window and add buttons to the layout
         buttonLayout = QBoxLayout(QBoxLayout.TopToBottom)
         buttonLayout.addWidget(self.connectButton)
+        buttonLayout.addWidget(self.heightButton)
         buttonLayout.addWidget(self.stationButton)
         buttonLayout.addWidget(self.setStationButton)
         buttonLayout.addWidget(self.measurePolyButton)
@@ -148,6 +151,7 @@ class QtGostApp(QWidget):
         
         #connect the button to the according function
         self.connectButton.clicked.connect(self.openConnectWindow)
+        self.heightButton.clicked.connect(self.openHeightWindow)
         self.stationButton.clicked.connect(self.openStationWindow)
         self.settingsButton.clicked.connect(self.openSettingsWindow)
         self.setStationButton.clicked.connect(self.openSetStationWindow)
@@ -242,6 +246,13 @@ class QtGostApp(QWidget):
             QMessageBox.critical(self, "Fehler", 
                                  "Debug Inforamtionen:\n%s" % traceback.format_exc())
 
+    def openHeightWindow(self):
+        try:
+            heightWindow = QtGostHeight(self)
+            heightWindow.show()
+        except Exception as e:
+            QMessageBox.critical(self, "Fehler", 
+                                 "Debug Inforamtionen:\n%s" % traceback.format_exc())
     
     def openStationWindow(self):
         try:
@@ -483,13 +494,64 @@ class QtGostConnect(QDialog):
         self.parentWidget().connection.open(port, bautrate)
         #enable buttons in the main window that only work with Tachy connected
         self.parentWidget().connectButton.setEnabled(False)
+        self.parentWidget().heightButton.setEnabled(True)
         self.parentWidget().stationButton.setEnabled(True)
         self.parentWidget().measurePolyButton.setEnabled(True)
         self.parentWidget().setStationButton.setEnabled(True)
    
         # self.meassureButton.setEnabled(True)
         super(QtGostConnect, self).accept()
+
+class QtGostHeight(QDialog):
+    """Window for setting heights in Tachymeter."""
+     
+    def __init__(self, parent=None):
+        super(QtGostHeight, self).__init__(parent)
+        self.cancleButton = QPushButton("Schließen")
+        self.reflectorField = QLineEdit()
+        self.setRefButton = QPushButton("Setzen")
+        self.instrumentField = QLineEdit()
+        self.setInsButton = QPushButton("Setzen")
+        
+        refH = self.parentWidget().connection.getReflectorHeight()
+        insH = self.parentWidget().connection.getInstrumentHeight()
+   
+        self.reflectorField.setText(str(refH))   
+        self.instrumentField.setText(str(insH))
     
+        mainLayout = QGridLayout()
+        mainLayout.addWidget(QLabel("Reflektorhöhe:"), 0, 0)
+        mainLayout.addWidget(self.reflectorField, 0, 1)
+        mainLayout.addWidget(self.setRefButton,0,2)
+        mainLayout.addWidget(QLabel("Instrumentenhöhe:"),1, 0)
+        mainLayout.addWidget(self.instrumentField, 1, 1)
+        mainLayout.addWidget(self.setInsButton,1,2)
+        
+        mainLayout.addWidget(self.cancleButton, 4, 1)
+        self.setLayout(mainLayout)
+        
+        self.setRefButton.clicked.connect(self.setRefHeight)
+        self.setInsButton.clicked.connect(self.setInsHeight)
+        self.cancleButton.clicked.connect(self.reject)
+     
+    def setRefHeight(self):
+        """Set the reflector height in the tachy to the value in the text field"""
+        h = float(self.reflectorField.text())
+        try:
+            self.parentWidget().connection.setReflectorHeight(h)
+        except TachyError as e:
+            QMessageBox.critical(self, "Fehler", 
+                                 "Debug Inforamtionen:\n%s" % traceback.format_exc())
+
+    def setInsHeight(self):
+        """Set the instrument height in the tachy to the value in the text field"""
+        h = float(self.instrumentField.text())
+        try:
+            self.parentWidget().connection.setInstrumentHeight(h)
+        except TachyError as e:
+            QMessageBox.critical(self, "Fehler", 
+                                 "Debug Inforamtionen:\n%s" % traceback.format_exc())
+                                 
 class QtGostStation(QDialog):
     
     """Window for Free Stationing"""
